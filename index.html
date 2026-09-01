@@ -1,0 +1,402 @@
+   const SUPABASE_URL      = "pxjqcaulmogjlbfheyqk";
+   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4anFjYXVsbW9namxiZmhleXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyODAzNzQsImV4cCI6MjEwMzg1NjM3NH0.kwJy4ElDY_4zpPKa7E-6pGB_Cf-SbdizDXyA58Jxguw";
+   const ADMIN_PW          = "seoulfire";
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>서울소방 탁구동호회 대회</title>
+
+<!-- 필요한 라이브러리 (인터넷에서 자동으로 불러옵니다) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","맑은 고딕",sans-serif;background:#f1f5f9;color:#1e293b}
+  .top{background:#0f172a;color:#fff;padding:14px 16px}
+  .top-in{max-width:920px;margin:0 auto;display:flex;align-items:center;gap:10px}
+  .bars{display:flex;gap:2px;align-items:flex-end;height:22px}
+  .bars i{width:5px;border-radius:2px;background:#ef4444;display:block}
+  .top h1{font-size:17px;margin:0;font-weight:700}
+  .top p{font-size:12px;color:#cbd5e1;margin:2px 0 0}
+  .nav{max-width:920px;margin:0 auto;display:flex;gap:6px;padding:10px 16px 0}
+  .nav button{background:#1e293b;color:#cbd5e1;border:0;padding:8px 14px;border-radius:8px 8px 0 0;font-size:14px;cursor:pointer}
+  .nav button.on{background:#f1f5f9;color:#0f172a;font-weight:700}
+  .wrap{max-width:920px;margin:0 auto;padding:16px}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:0 0 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  h2{font-size:16px;margin:0 0 12px}
+  h3{font-size:14px;margin:0 0 8px}
+  label{font-size:13px;color:#475569}
+  input,select{border:1px solid #cbd5e1;border-radius:8px;padding:9px 10px;font-size:14px;width:100%;background:#fff}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btn{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer}
+  .btn:hover{background:#f8fafc}
+  .btn-p{background:#d32f2f;color:#fff;border-color:#d32f2f;font-weight:600}
+  .btn-p:hover{background:#b91c1c}
+  .btn-d{color:#d32f2f}
+  .btn-sm{padding:5px 10px;font-size:13px}
+  .pill{background:#e2e8f0;border-radius:6px;padding:2px 8px;font-size:12px}
+  .pill-div{tab-size:0}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid #eef2f7}
+  th{color:#64748b;font-weight:600;font-size:13px}
+  .muted{color:#94a3b8}
+  .win{color:#d32f2f;font-weight:700}
+  .msg{font-size:14px;padding:10px 12px;border-radius:8px;margin-top:10px}
+  .msg-ok{background:#ecfdf5;color:#047857}
+  .msg-no{background:#fef2f2;color:#b91c1c}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .tabs button{border:1px solid #cbd5e1;background:#fff;border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer}
+  .tabs button.on{background:#d32f2f;color:#fff;border-color:#d32f2f}
+  .segs{display:flex;gap:6px;margin-bottom:12px}
+  .segs button{flex:1;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:8px;font-size:14px;cursor:pointer}
+  .segs button.on{background:#0f172a;color:#fff;border-color:#0f172a}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:640px){.g2{grid-template-columns:1fr}}
+  .mt{display:flex;align-items:center;gap:6px;font-size:14px;padding:3px 0}
+  .mt button{flex:1;text-align:center;border:0;background:transparent;padding:5px;border-radius:6px;cursor:pointer;font-size:14px}
+  .mt button:hover{background:#f8fafc}
+  .brk{display:flex;gap:24px;min-width:max-content;padding:6px 2px}
+  .brk-col{display:flex;flex-direction:column;justify-content:space-around;gap:14px}
+  .brk-col p{font-size:12px;color:#94a3b8;text-align:center;margin:0 0 2px;font-weight:600}
+  .brk-m{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;width:190px}
+  .brk-m button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid #eef2f7;color:#475569}
+  .brk-m button:last-child{border-bottom:0}
+  .brk-m button:hover:not(:disabled){background:#f8fafc}
+  .brk-m button.w{color:#d32f2f;font-weight:700}
+  .champ{align-self:center;background:#d32f2f;color:#fff;border-radius:8px;padding:12px 16px;font-weight:700;width:190px;text-align:center}
+  .scroll{overflow-x:auto}
+  .setup{max-width:640px;margin:40px auto;padding:0 16px}
+  .setup ol{line-height:1.9;font-size:14px} .setup code{background:#e2e8f0;padding:1px 6px;border-radius:4px}
+  @media print{.no-print{display:none!important}.card{box-shadow:none;border:none}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+/* ============================================================
+   ▼▼▼  여기 3줄만 내 값으로 바꾸면 끝  ▼▼▼
+   (Supabase 가입 후 Settings > API 에서 복사)
+============================================================ */
+const SUPABASE_URL      = "https://YOUR-PROJECT.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-KEY";
+const ADMIN_PW          = "0119";   // 운영진 화면 비밀번호
+/* ============================================================
+   ▲▲▲  위 3줄만 수정하세요  ▲▲▲
+============================================================ */
+
+const { useState, useEffect } = React;
+const EVENTS = [["single","단식"],["double","복식"],["team","단체전"]];
+const EVLABEL = Object.fromEntries(EVENTS);
+const DIVS = ["1부","2부","3부","4부","5부","6부"];
+
+/* ---------- 대진 계산 엔진 ---------- */
+function makeGroups(entries, size){
+  const byDiv={}; entries.forEach(p=>{const d=p.div||"1부";(byDiv[d]=byDiv[d]||[]).push(p);});
+  const groups=[]; let idx=0;
+  DIVS.filter(d=>byDiv[d]).forEach(div=>{
+    const list=[...byDiv[div]];
+    for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}
+    for(let i=0;i<list.length;i+=size)
+      groups.push({id:`g_${div}_${i}`,name:`${String.fromCharCode(65+idx++)}조`,div,members:list.slice(i,i+size).map(p=>p.id)});
+  });
+  return groups;
+}
+function roundRobin(ids){const r=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)r.push([ids[i],ids[j]]);return r;}
+const pKey=(g,a,b)=>`${g}|${[a,b].sort().join("~")}`;
+function standings(g,prelim){
+  const rec={}; g.members.forEach(m=>rec[m]={id:m,win:0,played:0});
+  roundRobin(g.members).forEach(([a,b])=>{const w=prelim[pKey(g.id,a,b)];if(w){rec[a].played++;rec[b].played++;if(rec[w])rec[w].win++;}});
+  return Object.values(rec).sort((x,y)=>y.win-x.win||y.played-x.played);
+}
+const nextPow2=n=>{let p=1;while(p<n)p*=2;return Math.max(p,1);};
+function seedPositions(n){let pols=[1,2];while(pols.length<n){const s=pols.length*2+1;const o=[];for(const p of pols){o.push(p);o.push(s-p);}pols=o;}return pols;}
+function matchWinner(m,w){if(m.a&&!m.b)return m.a;if(m.b&&!m.a)return m.b;if(!m.a||!m.b)return null;const id=w[m.id];if(m.a&&id===m.a.id)return m.a;if(m.b&&id===m.b.id)return m.b;return null;}
+function buildRounds(seeds,winners){
+  if(seeds.length<2)return[];
+  const size=nextPow2(seeds.length),pos=seedPositions(size),slots=pos.map(p=>seeds[p-1]||null);
+  const rounds=[];let r0=[];for(let i=0;i<size;i+=2)r0.push({id:`r0m${i/2}`,a:slots[i],b:slots[i+1]});rounds.push(r0);
+  let r=0;
+  while(rounds[r].length>1){const prev=rounds[r],nx=[];for(let i=0;i<prev.length;i+=2)nx.push({id:`r${r+1}m${i/2}`,a:matchWinner(prev[i],winners),b:matchWinner(prev[i+1],winners)});rounds.push(nx);r++;}
+  return rounds;
+}
+const roundName=(i,t)=>{const e=t-i;return e===1?"결승":e===2?"준결승":e===3?"8강":e===4?"16강":`${i+1}라운드`;};
+const divsOf=st=>DIVS.filter(d=>(st.groups||[]).some(g=>g.div===d));
+function advancersOf(st,div,byId){
+  const gs=(st.groups||[]).filter(g=>g.div===div),adv=st.advance||2,pr=st.prelim||{},seeds=[];
+  for(let r=0;r<adv;r++)gs.forEach(g=>{const s=standings(g,pr)[r];if(s&&byId[s.id])seeds.push(byId[s.id]);});
+  return seeds;
+}
+
+/* ---------- Supabase ---------- */
+const configured = !SUPABASE_URL.includes("YOUR-") && !SUPABASE_ANON_KEY.includes("YOUR-");
+let sb=null; try{ if(configured) sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);}catch(e){}
+async function fetchAll(){
+  const {data:ent}=await sb.from('entries').select('*').order('created_at');
+  const {data:ts}=await sb.from('tstate').select('*');
+  const states={}; (ts||[]).forEach(r=>states[r.event]=r.data||{});
+  return {entries:ent||[],states};
+}
+const saveState=(event,data)=>sb.from('tstate').upsert({event,data,updated_at:new Date().toISOString()});
+const addEntry   =row=>sb.from('entries').insert(row);
+const updateEntry=(id,patch)=>sb.from('entries').update(patch).eq('id',id);
+const deleteEntry=id=>sb.from('entries').delete().eq('id',id);
+
+/* ---------- 공용 화면 부품 ---------- */
+function Bracket({rounds,winners,onPick,readOnly}){
+  const t=rounds.length, champ=matchWinner(rounds[t-1][0],winners);
+  return (
+    <div className="scroll"><div className="brk">
+      {rounds.map((round,ri)=>(
+        <div className="brk-col" key={ri}>
+          <p>{roundName(ri,t)}</p>
+          {round.map(m=>{
+            const w=matchWinner(m,winners);
+            const Side=({pl})=>(
+              <button disabled={readOnly||!pl} className={w&&pl&&w.id===pl.id?"w":""}
+                onClick={()=>pl&&onPick&&onPick(m.id,pl.id)}>
+                {pl?pl.name:<span className="muted">부전승</span>}
+              </button>
+            );
+            return <div className="brk-m" key={m.id}><Side pl={m.a}/><Side pl={m.b}/></div>;
+          })}
+        </div>
+      ))}
+      {champ&&<div style={{display:"flex",flexDirection:"column",justifyContent:"center"}}><p style={{fontSize:12,color:"#94a3b8",textAlign:"center"}}>우승</p><div className="champ">🏆 {champ.name}</div></div>}
+    </div></div>
+  );
+}
+function GroupsRead({state,byId}){
+  const groups=state.groups||[],prelim=state.prelim||{},adv=state.advance||2;
+  if(!groups.length)return <p className="muted">아직 조 편성 전입니다.</p>;
+  return <div className="g2">{groups.map(g=>{
+    const st=standings(g,prelim);
+    return <div className="card" key={g.id}>
+      <h3>{g.name} <span className="muted" style={{fontWeight:400}}>/ {g.div}</span></h3>
+      <table><thead><tr><th style={{width:40}}>순위</th><th>선수</th><th style={{width:40}}>승</th></tr></thead>
+      <tbody>{st.map((s,i)=>{const p=byId[s.id];const a=i<adv;return <tr key={s.id} className={a?"win":""}><td>{i+1}{a&&" ▲"}</td><td>{p&&p.name}</td><td>{s.win}</td></tr>;})}</tbody></table>
+    </div>;
+  })}</div>;
+}
+
+/* ---------- 참가 신청 ---------- */
+function Register({entries,reload}){
+  const [ev,setEv]=useState("single"),[dv,setDv]=useState("1부");
+  const [name,setName]=useState(""),[org,setOrg]=useState("");
+  const [p1,setP1]=useState(""),[p2,setP2]=useState(""),[phone,setPhone]=useState("");
+  const [msg,setMsg]=useState(null),[busy,setBusy]=useState(false);
+  const [qn,setQn]=useState(""),[qp,setQp]=useState("");
+  const submit=async()=>{
+    let dn=name.trim();
+    if(ev==="double"){if(!p1.trim()||!p2.trim())return setMsg(["no","복식은 두 선수 이름이 필요합니다."]);dn=`${p1.trim()}·${p2.trim()}`;}
+    else if(!dn)return setMsg(["no", ev==="team"?"팀명을 입력하세요.":"이름을 입력하세요."]);
+    if(!phone.trim())return setMsg(["no","연락처를 입력하세요 (신청 조회에 사용)."]);
+    setBusy(true);
+    try{
+      await addEntry({event:ev,div:dv,name:dn,org:ev==="team"?dn:org.trim(),p1:p1.trim()||null,p2:p2.trim()||null,phone:phone.trim()});
+      setMsg(["ok","신청이 접수되었습니다!"]);setName("");setOrg("");setP1("");setP2("");
+      await reload();
+    }catch(e){setMsg(["no","오류가 발생했습니다. 잠시 후 다시 시도하세요."]);}
+    setBusy(false);
+  };
+  const mine=(qn.trim()||qp.trim())?entries.filter(e=>(qn.trim()?e.name.includes(qn.trim()):true)&&(qp.trim()?(e.phone||"").includes(qp.trim()):true)):[];
+  const cancel=async(id)=>{if(!confirm("이 신청을 취소할까요?"))return;await deleteEntry(id);await reload();};
+  return (<>
+    <div className="card">
+      <h2>참가 신청</h2>
+      <div className="segs">{EVENTS.map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>setEv(k)}>{t}</button>)}</div>
+      <div className="grid">
+        {ev==="double"?<>
+          <input placeholder="선수 1" value={p1} onChange={e=>setP1(e.target.value)}/>
+          <input placeholder="선수 2" value={p2} onChange={e=>setP2(e.target.value)}/>
+          <input placeholder="소속 (예: 종로소방서)" value={org} onChange={e=>setOrg(e.target.value)}/>
+        </>:ev==="team"?<>
+          <input placeholder="팀명 (예: 종로소방서)" value={name} onChange={e=>setName(e.target.value)} style={{gridColumn:"1 / -1"}}/>
+        </>:<>
+          <input placeholder="이름" value={name} onChange={e=>setName(e.target.value)}/>
+          <input placeholder="소속 (예: 종로소방서)" value={org} onChange={e=>setOrg(e.target.value)}/>
+        </>}
+        <select value={dv} onChange={e=>setDv(e.target.value)}>{DIVS.map(d=><option key={d}>{d}</option>)}</select>
+        <input placeholder="연락처 (신청 조회용)" value={phone} onChange={e=>setPhone(e.target.value)}/>
+      </div>
+      <div style={{marginTop:12}}><button className="btn btn-p" disabled={busy} onClick={submit}>{busy?"접수 중…":"신청하기"}</button></div>
+      {msg&&<div className={"msg "+(msg[0]==="ok"?"msg-ok":"msg-no")}>{msg[1]}</div>}
+    </div>
+    <div className="card">
+      <h2>내 신청 조회 · 취소</h2>
+      <div className="row"><input placeholder="이름/팀명" value={qn} onChange={e=>setQn(e.target.value)} style={{flex:1}}/><input placeholder="연락처" value={qp} onChange={e=>setQp(e.target.value)} style={{flex:1}}/></div>
+      {(qn.trim()||qp.trim())&&(mine.length?
+        <table style={{marginTop:12}}><thead><tr><th>종목</th><th>이름</th><th>부수</th><th></th></tr></thead>
+        <tbody>{mine.map(e=><tr key={e.id}><td>{EVLABEL[e.event]}</td><td>{e.name}</td><td><span className="pill">{e.div}</span></td><td><button className="btn btn-sm btn-d" onClick={()=>cancel(e.id)}>취소</button></td></tr>)}</tbody></table>
+        :<p className="muted" style={{marginTop:12}}>해당하는 신청이 없습니다.</p>)}
+    </div>
+  </>);
+}
+
+/* ---------- 대진표 보기 (참가자용, 읽기전용) ---------- */
+function PublicView({entries,states,reload}){
+  const [ev,setEv]=useState("single");
+  const st=states[ev]||{}, byId={}; entries.forEach(e=>byId[e.id]=e);
+  const divs=divsOf(st);
+  const [dv,setDv]=useState("");
+  const activeDiv=dv||divs[0]||"";
+  return (<div className="card">
+    <div className="row no-print" style={{justifyContent:"space-between"}}>
+      <h2 style={{margin:0}}>대진표 보기</h2>
+      <button className="btn btn-sm" onClick={reload}>🔄 새로고침</button>
+    </div>
+    <div className="segs" style={{marginTop:12}}>{EVENTS.map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>{setEv(k);setDv("");}}>{t}</button>)}</div>
+    <h3 style={{marginTop:16}}>예선 조 순위</h3>
+    <GroupsRead state={st} byId={byId}/>
+    <h3 style={{marginTop:20}}>본선 대진</h3>
+    {divs.length===0?<p className="muted">본선 대진이 아직 없습니다.</p>:<>
+      <div className="tabs">{divs.map(d=><button key={d} className={activeDiv===d?"on":""} onClick={()=>setDv(d)}>{d}</button>)}</div>
+      {(()=>{const rounds=buildRounds(advancersOf(st,activeDiv,byId),(st.knockWinners||{})[activeDiv]||{});return rounds.length?<Bracket rounds={rounds} winners={(st.knockWinners||{})[activeDiv]||{}} readOnly/>:<p className="muted">진출자가 부족합니다.</p>;})()}
+    </>}
+  </div>);
+}
+
+/* ---------- 운영진(관리자) ---------- */
+function Login({onOk}){
+  const [pw,setPw]=useState(""),[no,setNo]=useState(false);
+  return <div className="card" style={{maxWidth:360,margin:"20px auto"}}>
+    <h2>운영진 로그인</h2>
+    <input type="password" placeholder="비밀번호" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&(pw===ADMIN_PW?onOk():setNo(true))}/>
+    <div style={{marginTop:10}}><button className="btn btn-p" onClick={()=>pw===ADMIN_PW?onOk():setNo(true)}>입장</button></div>
+    {no&&<div className="msg msg-no">비밀번호가 올바르지 않습니다.</div>}
+  </div>;
+}
+function Admin({entries,states,setStates,reload}){
+  const [ev,setEv]=useState("single");
+  const [tab,setTab]=useState("list");
+  const [dv,setDv]=useState("");
+  const st=states[ev]||{advance:2}, byId={}; entries.forEach(e=>byId[e.id]=e);
+  const evEntries=entries.filter(e=>e.event===ev);
+  const patch=async(nd)=>{setStates(s=>({...s,[ev]:nd}));try{await saveState(ev,nd);}catch(e){console.error(e);}};
+  const draw=()=>patch({...st,groups:makeGroups(evEntries,3),prelim:{},knockWinners:{},advance:st.advance||2});
+  const setWin=(g,a,b,w)=>patch({...st,prelim:{...(st.prelim||{}),[pKey(g,a,b)]:w}});
+  const divs=divsOf(st), activeDiv=dv||divs[0]||"";
+  const setKnock=(mid,pid)=>{
+    const r=parseInt(mid.match(/^r(\d+)/)[1]), cur=(st.knockWinners||{})[activeDiv]||{}, nw={};
+    Object.keys(cur).forEach(k=>{if(parseInt(k.match(/^r(\d+)/)[1])<=r)nw[k]=cur[k];});nw[mid]=pid;
+    patch({...st,knockWinners:{...(st.knockWinners||{}),[activeDiv]:nw}});
+  };
+  const togglePaid=async(e)=>{await updateEntry(e.id,{paid:!e.paid});await reload();};
+  const del=async(id)=>{if(!confirm("이 참가자를 삭제할까요?"))return;await deleteEntry(id);await reload();};
+  const ADMTABS=[["list","신청현황"],["group","조편성·예선"],["knock","본선"],["print","출력"]];
+  return (<>
+    <div className="segs no-print">{EVENTS.map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>{setEv(k);setDv("");}}>{t}</button>)}</div>
+    <div className="tabs no-print">{ADMTABS.map(([k,t])=><button key={k} className={tab===k?"on":""} onClick={()=>setTab(k)}>{t}</button>)}
+      <button className="btn btn-sm" style={{marginLeft:"auto"}} onClick={reload}>🔄 새로고침</button></div>
+
+    {tab==="list"&&<div className="card">
+      <h2>{EVLABEL[ev]} 신청현황 ({evEntries.length})</h2>
+      {evEntries.length===0?<p className="muted">신청자가 없습니다.</p>:
+      <table><thead><tr><th>#</th><th>이름</th><th>소속</th><th>부수</th><th>연락처</th><th>입금</th><th></th></tr></thead>
+      <tbody>{evEntries.map((e,i)=><tr key={e.id}>
+        <td className="muted">{i+1}</td><td>{e.name}</td><td>{ev==="team"?"-":e.org||"-"}</td>
+        <td><span className="pill">{e.div}</span></td><td className="muted">{e.phone||"-"}</td>
+        <td><button className={"btn btn-sm "+(e.paid?"btn-p":"")} onClick={()=>togglePaid(e)}>{e.paid?"완료":"미납"}</button></td>
+        <td><button className="btn btn-sm btn-d" onClick={()=>del(e.id)}>삭제</button></td>
+      </tr>)}</tbody></table>}
+    </div>}
+
+    {tab==="group"&&<>
+      <div className="card no-print"><div className="row">
+        <label>본선 진출&nbsp;
+          <select value={st.advance||2} onChange={e=>patch({...st,advance:Number(e.target.value)})}>
+            <option value={1}>조 1위</option><option value={2}>조 2명</option><option value={3}>전원 통과</option>
+          </select></label>
+        <button className="btn btn-p" onClick={draw}>자동 조 편성</button>
+        <span className="muted" style={{fontSize:13}}>부수(1~6부)별 3명씩 자동 배정</span>
+      </div></div>
+      {(st.groups||[]).length===0?<div className="card"><p className="muted">먼저 조를 편성하세요.</p></div>:
+      <div className="g2">{st.groups.map(g=>{const stn=standings(g,st.prelim||{}),adv=st.advance||2;
+        return <div className="card" key={g.id}>
+          <h3>{g.name} <span className="muted" style={{fontWeight:400}}>/ {g.div}</span></h3>
+          {roundRobin(g.members).map(([a,b])=>{const w=(st.prelim||{})[pKey(g.id,a,b)],pa=byId[a],pb=byId[b];if(!pa||!pb)return null;
+            return <div className="mt" key={a+b}>
+              <button className={w===a?"win":""} style={{textAlign:"right"}} onClick={()=>setWin(g.id,a,b,a)}>{pa.name}</button>
+              <span className="muted" style={{fontSize:12}}>vs</span>
+              <button className={w===b?"win":""} style={{textAlign:"left"}} onClick={()=>setWin(g.id,a,b,b)}>{pb.name}</button>
+            </div>;})}
+          <table style={{marginTop:8,borderTop:"1px solid #eef2f7"}}><thead><tr><th style={{width:40}}>순위</th><th>선수</th><th style={{width:36}}>승</th></tr></thead>
+          <tbody>{stn.map((s,i)=>{const p=byId[s.id],a=i<adv;return <tr key={s.id} className={a?"win":""}><td>{i+1}{a&&" ▲"}</td><td>{p&&p.name}</td><td>{s.win}</td></tr>;})}</tbody></table>
+        </div>;})}</div>}
+    </>}
+
+    {tab==="knock"&&<div className="card">
+      {divs.length===0?<p className="muted">먼저 예선을 진행하세요.</p>:<>
+        <div className="tabs no-print">{divs.map(d=><button key={d} className={activeDiv===d?"on":""} onClick={()=>setDv(d)}>{d}</button>)}</div>
+        {(()=>{const rounds=buildRounds(advancersOf(st,activeDiv,byId),(st.knockWinners||{})[activeDiv]||{});return rounds.length?<Bracket rounds={rounds} winners={(st.knockWinners||{})[activeDiv]||{}} onPick={setKnock}/>:<p className="muted">진출자가 2 이상 필요합니다.</p>;})()}
+      </>}
+    </div>}
+
+    {tab==="print"&&<>
+      <div className="no-print" style={{textAlign:"right",marginBottom:10}}><button className="btn btn-p" onClick={()=>window.print()}>인쇄 / PDF 저장</button></div>
+      <div className="card">
+        <h2 style={{textAlign:"center"}}>서울소방 탁구동호회 대회 대진표 — {EVLABEL[ev]}</h2>
+        {divs.length===0&&<p className="muted" style={{textAlign:"center"}}>본선 대진이 없습니다.</p>}
+        {divs.map(d=>{const rounds=buildRounds(advancersOf(st,d,byId),(st.knockWinners||{})[d]||{});
+          return <div key={d} style={{marginBottom:24}}>
+            <h3 style={{borderLeft:"4px solid #d32f2f",paddingLeft:8}}>{d} 본선</h3>
+            {rounds.length?<Bracket rounds={rounds} winners={(st.knockWinners||{})[d]||{}} readOnly/>:<p className="muted">진출자 부족</p>}
+          </div>;})}
+      </div>
+    </>}
+  </>);
+}
+
+/* ---------- 설정 안내(키 입력 전 화면) ---------- */
+function Setup(){
+  return <div className="setup"><div className="card">
+    <h2>⚙️ 설정이 필요합니다</h2>
+    <p style={{fontSize:14,color:"#475569"}}>이 파일(index.html)을 열어 맨 위 3줄만 내 값으로 바꾸면 작동합니다.</p>
+    <ol>
+      <li><b>supabase.com</b> 무료 가입 → 새 프로젝트 생성</li>
+      <li>왼쪽 <b>SQL Editor</b>에 <code>schema.sql</code> 붙여넣고 <b>Run</b></li>
+      <li><b>Settings → API</b>에서 <code>Project URL</code>과 <code>anon public</code> 키 복사</li>
+      <li>index.html 맨 위 <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>에 붙여넣기</li>
+      <li>저장 후 배포(Netlify Drop에 파일 드래그 또는 GitHub+Vercel)</li>
+    </ol>
+    <p style={{fontSize:13,color:"#94a3b8"}}>함께 받은 README.md에 그림처럼 단계별 설명이 있습니다.</p>
+  </div></div>;
+}
+
+/* ---------- 앱 ---------- */
+function App(){
+  if(!configured) return <Setup/>;
+  const [view,setView]=useState("register");
+  const [isAdmin,setIsAdmin]=useState(false);
+  const [entries,setEntries]=useState([]);
+  const [states,setStates]=useState({});
+  const [loading,setLoading]=useState(true);
+  const reload=async()=>{setLoading(true);try{const d=await fetchAll();setEntries(d.entries);setStates(d.states);}catch(e){console.error(e);}setLoading(false);};
+  useEffect(()=>{reload();},[]);
+  const NAV=[["register","참가신청"],["bracket","대진표 보기"],["admin","운영진"]];
+  return <>
+    <div className="top"><div className="top-in">
+      <div className="bars"><i style={{height:10}}/><i style={{height:18}}/><i style={{height:22}}/><i style={{height:15}}/><i style={{height:20}}/></div>
+      <div><h1>서울소방 탁구동호회 대회</h1><p>참가신청 · 대진표 · 운영</p></div>
+    </div>
+    <div className="nav no-print">{NAV.map(([k,t])=><button key={k} className={view===k?"on":""} onClick={()=>setView(k)}>{t}</button>)}</div>
+    </div>
+    <div className="wrap">
+      {loading&&<p className="muted">불러오는 중…</p>}
+      {view==="register"&&<Register entries={entries} reload={reload}/>}
+      {view==="bracket"&&<PublicView entries={entries} states={states} reload={reload}/>}
+      {view==="admin"&&(isAdmin?<Admin entries={entries} states={states} setStates={setStates} reload={reload}/>:<Login onOk={()=>setIsAdmin(true)}/>)}
+    </div>
+  </>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
