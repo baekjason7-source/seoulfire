@@ -1,7 +1,3 @@
-  const SUPABASE_URL      = "https://pxjqcaulmogjlbfheyqk.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_LjzwGzsjNQlC5dALI2DU8A_d_nxISft";
-  const ADMIN_PW          = "seoufire";
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -82,14 +78,13 @@
 
 <script type="text/babel" data-presets="react">
 /* ============================================================
-   ▼▼▼  여기 3줄만 내 값으로 바꾸면 끝  ▼▼▼
-   (Supabase 가입 후 Settings > API 에서 복사)
+   ▼▼▼  대회 설정 (이미 입력됨)  ▼▼▼
 ============================================================ */
-const SUPABASE_URL      = "https://YOUR-PROJECT.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR-ANON-KEY";
-const ADMIN_PW          = "0119";   // 운영진 화면 비밀번호
+const SUPABASE_URL      = "https://pxjqcaulmogjlbfheyqk.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_LjzwGzsjNQlC5dALI2DU8A_d_nxISft";
+const ADMIN_PW          = "seoulfire";   // 운영진 화면 비밀번호
 /* ============================================================
-   ▲▲▲  위 3줄만 수정하세요  ▲▲▲
+   ▲▲▲  키가 안 맞으면 위 값을 다시 확인하세요  ▲▲▲
 ============================================================ */
 
 const { useState, useEffect } = React;
@@ -362,7 +357,7 @@ function Setup(){
     <ol>
       <li><b>supabase.com</b> 무료 가입 → 새 프로젝트 생성</li>
       <li>왼쪽 <b>SQL Editor</b>에 <code>schema.sql</code> 붙여넣고 <b>Run</b></li>
-      <li><b>Settings → API</b>에서 <code>Project URL</code>과 <code>anon public</code> 키 복사</li>
+      <li><b>Settings → API Keys</b>에서 <code>Project URL</code>과 <code>Publishable key</code> 복사</li>
       <li>index.html 맨 위 <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>에 붙여넣기</li>
       <li>저장 후 배포(Netlify Drop에 파일 드래그 또는 GitHub+Vercel)</li>
     </ol>
