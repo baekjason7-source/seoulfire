@@ -115,14 +115,17 @@ const EVLABEL = Object.fromEntries(EVENTS);
 const DIVS = ["1부","2부","3부","4부","5부","6부"];
 
 /* ---------- 대진 계산 엔진 ---------- */
-function makeGroups(entries, size){
-  const byDiv={}; entries.forEach(p=>{const d=p.div||"1부";(byDiv[d]=byDiv[d]||[]).push(p);});
+function tierOf(map,d){return (map&&map[d])?map[d]:d;}
+function makeGroups(entries, size, tierMap){
+  const byTier={}; entries.forEach(p=>{const t=tierOf(tierMap,p.div||"1부");(byTier[t]=byTier[t]||[]).push(p);});
+  const mi=name=>{let m=99;DIVS.forEach((d,i)=>{if(tierOf(tierMap,d)===name&&i<m)m=i;});return m;};
+  const tiers=Object.keys(byTier).sort((A,B)=>mi(A)-mi(B));
   const groups=[]; let idx=0;
-  DIVS.filter(d=>byDiv[d]).forEach(div=>{
-    const list=[...byDiv[div]];
+  tiers.forEach(t=>{
+    const list=[...byTier[t]];
     for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}
     for(let i=0;i<list.length;i+=size)
-      groups.push({id:`g_${div}_${i}`,name:`${String.fromCharCode(65+idx++)}조`,div,members:list.slice(i,i+size).map(p=>p.id)});
+      groups.push({id:`g_${t}_${i}`,name:`${String.fromCharCode(65+idx++)}조`,div:t,members:list.slice(i,i+size).map(p=>p.id)});
   });
   return groups;
 }
@@ -223,7 +226,7 @@ function PrelimSheet({state,byId,evLabel}){
     return <div className="sheet" key={g.id}>
       <div className="sheet-h">
         <div className="sheet-g">{g.name}</div>
-        <div className="sheet-t">{evLabel} · {g.div}부 예선 결과지<small>세트 점수를 반드시 기록하세요 — 동점 시 순위 판정에 사용됩니다.</small></div>
+        <div className="sheet-t">{evLabel} · {g.div} 예선 결과지<small>세트 점수를 반드시 기록하세요 — 동점 시 순위 판정에 사용됩니다.</small></div>
         <div className="sheet-tb">탁구대<br/>______</div>
       </div>
       <table className="srank"><tbody><tr>
@@ -336,7 +339,10 @@ function Admin({entries,states,setStates,reload}){
   const evEntries=entries.filter(e=>e.event===ev);
   const adv=st.advance||2;
   const patch=async(nd)=>{setStates(s=>({...s,[ev]:nd}));try{await saveState(ev,nd);}catch(e){console.error(e);}};
-  const draw=()=>patch({...st,groups:makeGroups(evEntries,3),prelim:{},knockWinners:{},advance:adv});
+  const tierMap=st.tierMap||{};
+  const setTier=(d,v)=>patch({...st,tierMap:{...tierMap,[d]:v}});
+  const applyPreset=(m)=>patch({...st,tierMap:m});
+  const draw=()=>patch({...st,groups:makeGroups(evEntries,3,st.tierMap||{}),prelim:{},knockWinners:{},advance:adv});
   const toggleWin=(g,a,b)=>{const key=pKey(g,a,b);const np={...(st.prelim||{})};if(np[key]===a)delete np[key];else np[key]=a;patch({...st,prelim:np});};
   const divs=divsOf(st), activeDiv=dv||divs[0]||"";
   const setKnock=(mid,pid)=>{const r=parseInt(mid.match(/^r(\d+)/)[1]),cur=(st.knockWinners||{})[activeDiv]||{},nw={};
@@ -363,13 +369,31 @@ function Admin({entries,states,setStates,reload}){
     </div>}
 
     {tab==="group"&&<>
+      <div className="card no-print">
+        <h3>부수 통합 설정</h3>
+        <p className="muted" style={{fontSize:13,margin:"0 0 8px"}}>같은 이름을 적은 부수끼리 하나로 통합되어 조편성·본선이 함께 진행됩니다. 변경 후 [자동 조 편성]을 다시 누르세요.</p>
+        <div className="tabs">
+          <button onClick={()=>applyPreset({})}>부수별 개별</button>
+          <button onClick={()=>applyPreset(Object.fromEntries(DIVS.map(d=>[d,"전체 통합"])))}>전체 통합</button>
+          <button onClick={()=>applyPreset({"1부":"1~3부","2부":"1~3부","3부":"1~3부","4부":"4~6부","5부":"4~6부","6부":"4~6부"})}>1~3 / 4~6</button>
+          <button onClick={()=>applyPreset({"4부":"4~6부","5부":"4~6부","6부":"4~6부"})}>4~6부 통합</button>
+          <button onClick={()=>applyPreset({"5부":"5·6부","6부":"5·6부"})}>5~6부 통합</button>
+        </div>
+        <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+          {DIVS.map(d=><div key={d} style={{display:"flex",alignItems:"center",gap:6}}>
+            <span className="pill" style={{minWidth:34,textAlign:"center"}}>{d}</span>
+            <input value={tierMap[d]||d} onChange={e=>setTier(d,e.target.value)} style={{fontSize:13,padding:"6px 8px"}}/>
+          </div>)}
+        </div>
+        <p className="muted" style={{fontSize:12,margin:"8px 0 0"}}>현재 통합부: {[...new Set(DIVS.map(d=>tierOf(tierMap,d)))].join("  ·  ")}</p>
+      </div>
       <div className="card no-print"><div className="row">
         <label>본선 진출&nbsp;
           <select value={adv} onChange={e=>patch({...st,advance:Number(e.target.value)})}>
             <option value={1}>조 1위</option><option value={2}>조 2명</option><option value={3}>전원 통과</option>
           </select></label>
         <button className="btn btn-p" onClick={draw}>자동 조 편성</button>
-        <span className="muted" style={{fontSize:13}}>부수별 3명씩 자동 배정 · 교차표에서 결과 입력</span>
+        <span className="muted" style={{fontSize:13}}>통합부별 3명씩 자동 배정 · 교차표에서 결과 입력</span>
       </div></div>
       {(st.groups||[]).length===0?<div className="card"><p className="muted">먼저 조를 편성하세요.</p></div>:
       <div className="g2">{st.groups.map(g=><div className="card" key={g.id}><div className="scroll">
