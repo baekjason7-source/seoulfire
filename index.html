@@ -95,6 +95,15 @@
   .sets{flex:1;display:flex;gap:5px;justify-content:center}
   .sb{width:36px;height:26px;border:1px solid #94a3b8;border-radius:3px;position:relative}
   .sb i{position:absolute;top:0;left:2px;font-size:8px;color:#cbd5e1;font-style:normal}
+  .pmx{width:100%;border-collapse:collapse}
+  .pmx th,.pmx td{border:1px solid #64748b;text-align:center;font-size:12px;padding:6px;height:42px}
+  .pmx td{min-width:54px}
+  .pmx .corner{background:#e2e8f0}
+  .pmx .ph{background:#f1f5f9;font-weight:700}
+  .pmx .ph small{display:block;font-weight:400;color:#64748b;font-size:10px}
+  .pmx .rh{background:#f8fafc;font-weight:700;text-align:left;white-space:nowrap;padding-left:10px}
+  .pmx .diag{background:#e2e8f0}
+  .pmx .sum{background:#fafafa;min-width:52px;font-weight:600}
   @media print{.no-print{display:none!important}.card{box-shadow:none;border:none;padding:0}.wrap{max-width:none}}
 </style>
 </head>
@@ -106,7 +115,7 @@
 ============================================================ */
 const SUPABASE_URL      = "https://pxjqcaulmogjlbfheyqk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4anFjYXVsbW9namxiZmhleXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyODAzNzQsImV4cCI6MjEwMzg1NjM3NH0.kwJy4ElDY_4zpPKa7E-6pGB_Cf-SbdizDXyA58Jxguw";
-const ADMIN_PW          = "seoul119";   // 운영진 화면 비밀번호
+const ADMIN_PW          = "seoulfire";   // 운영진 화면 비밀번호
 /* ============================================================ */
 
 const { useState, useEffect } = React;
@@ -118,8 +127,8 @@ const DIVS = ["1부","2부","3부","4부","5부","6부"];
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
 function makeGroups(entries, size, tierMap){
   const byTier={}; entries.forEach(p=>{const t=tierOf(tierMap,p.div||"1부");(byTier[t]=byTier[t]||[]).push(p);});
-  const mi=name=>{let m=99;DIVS.forEach((d,i)=>{if(tierOf(tierMap,d)===name&&i<m)m=i;});return m;};
-  const tiers=Object.keys(byTier).sort((A,B)=>mi(A)-mi(B));
+  const gnum=s=>{const m=String(s).match(/\d+/);return m?+m[0]:99;};
+  const tiers=Object.keys(byTier).sort((A,B)=>gnum(A)-gnum(B));
   const groups=[]; let idx=0;
   tiers.forEach(t=>{
     const list=[...byTier[t]];
@@ -148,7 +157,7 @@ function buildRounds(seeds,winners){
   return rounds;
 }
 const roundName=(i,t)=>{const e=t-i;return e===1?"결승":e===2?"준결승":e===3?"8강":e===4?"16강":`${i+1}라운드`;};
-const divsOf=st=>DIVS.filter(d=>(st.groups||[]).some(g=>g.div===d));
+const divsOf=st=>{const s=[];(st.groups||[]).forEach(g=>{if(!s.includes(g.div))s.push(g.div);});return s;};
 function advancersOf(st,div,byId){
   const gs=(st.groups||[]).filter(g=>g.div===div),adv=st.advance||2,pr=st.prelim||{},seeds=[];
   for(let r=0;r<adv;r++)gs.forEach(g=>{const s=standings(g,pr)[r];if(s&&byId[s.id])seeds.push(byId[s.id]);});
@@ -226,21 +235,25 @@ function PrelimSheet({state,byId,evLabel}){
     return <div className="sheet" key={g.id}>
       <div className="sheet-h">
         <div className="sheet-g">{g.name}</div>
-        <div className="sheet-t">{evLabel} · {g.div} 예선 결과지<small>세트 점수를 반드시 기록하세요 — 동점 시 순위 판정에 사용됩니다.</small></div>
+        <div className="sheet-t">{evLabel} · {g.div} 예선 결과지<small>각 칸에 이긴 게임(세트) 수를 적으세요. 동점 시 득·실로 순위를 판정합니다.</small></div>
         <div className="sheet-tb">탁구대<br/>______</div>
       </div>
-      <table className="srank"><tbody><tr>
-        <td className="lbl">선수<br/>순위</td>
-        {members.map(m=><td key={m.id}><b>{m.name}</b><small>{m.org||""}</small><div className="rbox"></div></td>)}
-      </tr></tbody></table>
-      <div className="smatch">
-        {roundRobin(g.members).map(([a,b])=>{const pa=byId[a],pb=byId[b];if(!pa||!pb)return null;
-          return <div className="mrow" key={a+b}>
-            <span className="pn">{pa.name}</span>
-            <span className="sets">{[1,2,3,4,5].map(i=><span className="sb" key={i}><i>{i}세트</i></span>)}</span>
-            <span className="pn r">{pb.name}</span>
-          </div>;})}
-      </div>
+      <table className="pmx">
+        <thead><tr>
+          <th className="corner"></th>
+          {members.map(m=><th className="ph" key={m.id}>{m.name}<small>{m.org||""}</small></th>)}
+          <th className="sum">승점</th><th className="sum">득·실</th><th className="sum">순위</th>
+        </tr></thead>
+        <tbody>
+          {members.map(rp=>(<tr key={rp.id}>
+            <th className="rh">{rp.name}</th>
+            {members.map(cp=> rp.id===cp.id
+              ? <td className="diag" key={cp.id}></td>
+              : <td className="cellw" key={cp.id}></td>)}
+            <td className="sum"></td><td className="sum"></td><td className="sum"></td>
+          </tr>))}
+        </tbody>
+      </table>
     </div>;
   })}</div>;
 }
@@ -248,41 +261,89 @@ function PrelimSheet({state,byId,evLabel}){
 /* ---------- 참가 신청 ---------- */
 function Register({entries,reload}){
   const [ev,setEv]=useState("single"),[dv,setDv]=useState("1부");
-  const [name,setName]=useState(""),[org,setOrg]=useState("");
-  const [p1,setP1]=useState(""),[p2,setP2]=useState(""),[phone,setPhone]=useState("");
+  const [name,setName]=useState(""),[org,setOrg]=useState(""),[phone,setPhone]=useState("");
+  const [p1,setP1]=useState({name:"",org:"",div:"1부",phone:""});
+  const [p2,setP2]=useState({name:"",org:"",div:"1부",phone:""});
+  const [team,setTeam]=useState({name:"",div:"1부",phone:""});
+  const [r,setR]=useState([{name:"",div:"1부"},{name:"",div:"1부"},{name:"",div:"1부"}]);
   const [msg,setMsg]=useState(null),[busy,setBusy]=useState(false);
   const [qn,setQn]=useState(""),[qp,setQp]=useState("");
+  const num=d=>parseInt(d)||0;
   const submit=async()=>{
-    let dn=name.trim();
-    if(ev==="double"){if(!p1.trim()||!p2.trim())return setMsg(["no","복식은 두 선수 이름이 필요합니다."]);dn=`${p1.trim()}·${p2.trim()}`;}
-    else if(!dn)return setMsg(["no", ev==="team"?"팀명을 입력하세요.":"이름을 입력하세요."]);
-    if(!phone.trim())return setMsg(["no","연락처를 입력하세요 (신청 조회에 사용)."]);
+    let row=null;
+    if(ev==="single"){
+      if(!name.trim())return setMsg(["no","이름을 입력하세요."]);
+      if(!phone.trim())return setMsg(["no","연락처를 입력하세요."]);
+      row={event:"single",name:name.trim(),org:org.trim(),div:dv,phone:phone.trim(),meta:{}};
+    }else if(ev==="double"){
+      if(!p1.name.trim()||!p2.name.trim())return setMsg(["no","두 선수 이름을 입력하세요."]);
+      if(!p1.phone.trim()&&!p2.phone.trim())return setMsg(["no","연락처를 하나 이상 입력하세요."]);
+      const hap=num(p1.div)+num(p2.div);
+      row={event:"double",name:p1.name.trim()+"·"+p2.name.trim(),org:p1.org.trim()+"/"+p2.org.trim(),
+        div:"합"+hap+"부",phone:(p1.phone||p2.phone).trim(),
+        meta:{p1:{name:p1.name.trim(),org:p1.org.trim(),div:p1.div,phone:p1.phone.trim()},
+              p2:{name:p2.name.trim(),org:p2.org.trim(),div:p2.div,phone:p2.phone.trim()},hap:hap}};
+    }else{
+      if(!team.name.trim())return setMsg(["no","팀명을 입력하세요."]);
+      const roster=r.filter(x=>x.name.trim()).map(x=>({name:x.name.trim(),div:x.div}));
+      if(!roster.length)return setMsg(["no","선수 명단을 입력하세요."]);
+      row={event:"team",name:team.name.trim(),org:team.name.trim(),div:team.div,phone:team.phone.trim(),meta:{roster:roster}};
+    }
     setBusy(true);
-    try{await addEntry({event:ev,div:dv,name:dn,org:ev==="team"?dn:org.trim(),p1:p1.trim()||null,p2:p2.trim()||null,phone:phone.trim()});
-      setMsg(["ok","신청이 접수되었습니다!"]);setName("");setOrg("");setP1("");setP2("");await reload();
-    }catch(e){setMsg(["no","오류가 발생했습니다. 잠시 후 다시 시도하세요."]);}
+    try{await addEntry(row);setMsg(["ok","신청이 접수되었습니다!"]);
+      setName("");setOrg("");setPhone("");
+      setP1({name:"",org:"",div:"1부",phone:""});setP2({name:"",org:"",div:"1부",phone:""});
+      setTeam({name:"",div:"1부",phone:""});setR([{name:"",div:"1부"},{name:"",div:"1부"},{name:"",div:"1부"}]);
+      await reload();
+    }catch(e){setMsg(["no","오류가 발생했습니다. (관리자: DB에 meta 열이 있는지 확인)"]);}
     setBusy(false);
   };
-  const mine=(qn.trim()||qp.trim())?entries.filter(e=>(qn.trim()?e.name.includes(qn.trim()):true)&&(qp.trim()?(e.phone||"").includes(qp.trim()):true)):[];
+  const hitPhone=e=>{const q=qp.trim();if(!q)return true;const m=e.meta||{};
+    return (e.phone||"").includes(q)||(m.p1&&(m.p1.phone||"").includes(q))||(m.p2&&(m.p2.phone||"").includes(q));};
+  const mine=(qn.trim()||qp.trim())?entries.filter(e=>(qn.trim()?e.name.includes(qn.trim()):true)&&hitPhone(e)):[];
   const cancel=async(id)=>{if(!confirm("이 신청을 취소할까요?"))return;await deleteEntry(id);await reload();};
+  const Dsel=({v,on})=><select value={v} onChange={e=>on(e.target.value)}>{DIVS.map(d=><option key={d}>{d}</option>)}</select>;
+  const hap=num(p1.div)+num(p2.div);
   return (<>
     <div className="card">
       <h2>참가 신청</h2>
       <div className="segs">{EVENTS.map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>setEv(k)}>{t}</button>)}</div>
-      <div className="grid">
-        {ev==="double"?<>
-          <input placeholder="선수 1" value={p1} onChange={e=>setP1(e.target.value)}/>
-          <input placeholder="선수 2" value={p2} onChange={e=>setP2(e.target.value)}/>
-          <input placeholder="소속 (예: 종로소방서)" value={org} onChange={e=>setOrg(e.target.value)}/>
-        </>:ev==="team"?<>
-          <input placeholder="팀명 (예: 종로소방서)" value={name} onChange={e=>setName(e.target.value)} style={{gridColumn:"1 / -1"}}/>
-        </>:<>
-          <input placeholder="이름" value={name} onChange={e=>setName(e.target.value)}/>
-          <input placeholder="소속 (예: 종로소방서)" value={org} onChange={e=>setOrg(e.target.value)}/>
-        </>}
-        <select value={dv} onChange={e=>setDv(e.target.value)}>{DIVS.map(d=><option key={d}>{d}</option>)}</select>
-        <input placeholder="연락처 (신청 조회용)" value={phone} onChange={e=>setPhone(e.target.value)}/>
-      </div>
+
+      {ev==="single"&&<div className="grid">
+        <input placeholder="이름" value={name} onChange={e=>setName(e.target.value)}/>
+        <input placeholder="소속 (예: 종로소방서)" value={org} onChange={e=>setOrg(e.target.value)}/>
+        <Dsel v={dv} on={setDv}/>
+        <input placeholder="연락처" value={phone} onChange={e=>setPhone(e.target.value)}/>
+      </div>}
+
+      {ev==="double"&&<>
+        <p className="muted" style={{fontSize:13,margin:"0 0 8px"}}>두 선수 정보를 각각 입력하세요. 합부수는 자동 계산됩니다.</p>
+        {[["선수 1",p1,setP1],["선수 2",p2,setP2]].map(([lbl,s,set])=>(
+          <div key={lbl} style={{border:"1px solid #eef2f7",borderRadius:8,padding:10,marginBottom:8}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#475569",marginBottom:6}}>{lbl}</div>
+            <div className="grid">
+              <input placeholder="이름" value={s.name} onChange={e=>set({...s,name:e.target.value})}/>
+              <input placeholder="소속" value={s.org} onChange={e=>set({...s,org:e.target.value})}/>
+              <Dsel v={s.div} on={v=>set({...s,div:v})}/>
+              <input placeholder="연락처" value={s.phone} onChange={e=>set({...s,phone:e.target.value})}/>
+            </div>
+          </div>))}
+        <span className="pill" style={{background:"#fee2e2",color:"#b91c1c",fontWeight:700}}>합부수 : 합{hap}부  ({p1.div} + {p2.div})</span>
+      </>}
+
+      {ev==="team"&&<>
+        <div className="grid">
+          <input placeholder="팀명 (예: 종로소방서)" value={team.name} onChange={e=>setTeam({...team,name:e.target.value})} style={{gridColumn:"1 / -1"}}/>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}><span className="muted" style={{fontSize:13,whiteSpace:"nowrap"}}>팀 부수</span><Dsel v={team.div} on={v=>setTeam({...team,div:v})}/></div>
+          <input placeholder="대표 연락처" value={team.phone} onChange={e=>setTeam({...team,phone:e.target.value})}/>
+        </div>
+        <p className="muted" style={{fontSize:13,margin:"10px 0 6px"}}>선수 명단 (이름 · 부수)</p>
+        {r.map((x,i)=><div key={i} className="grid" style={{marginBottom:6}}>
+          <input placeholder={"선수 "+(i+1)} value={x.name} onChange={e=>{const c=[...r];c[i]={...c[i],name:e.target.value};setR(c);}}/>
+          <Dsel v={x.div} on={v=>{const c=[...r];c[i]={...c[i],div:v};setR(c);}}/>
+        </div>)}
+      </>}
+
       <div style={{marginTop:12}}><button className="btn btn-p" disabled={busy} onClick={submit}>{busy?"접수 중…":"신청하기"}</button></div>
       {msg&&<div className={"msg "+(msg[0]==="ok"?"msg-ok":"msg-no")}>{msg[1]}</div>}
     </div>
@@ -294,7 +355,7 @@ function Register({entries,reload}){
         <tbody>{mine.map(e=><tr key={e.id}><td>{EVLABEL[e.event]}</td><td>{e.name}</td><td><span className="pill">{e.div}</span></td><td><button className="btn btn-sm btn-d" onClick={()=>cancel(e.id)}>취소</button></td></tr>)}</tbody></table>
         :<p className="muted" style={{marginTop:12}}>해당하는 신청이 없습니다.</p>)}
     </div>
-  </>);
+    </>);
 }
 
 /* ---------- 대진표 보기 (참가자용) ---------- */
@@ -361,7 +422,12 @@ function Admin({entries,states,setStates,reload}){
       {evEntries.length===0?<p className="muted">신청자가 없습니다.</p>:
       <table><thead><tr><th>#</th><th>이름</th><th>소속</th><th>부수</th><th>연락처</th><th>입금</th><th></th></tr></thead>
       <tbody>{evEntries.map((e,i)=><tr key={e.id}>
-        <td className="muted">{i+1}</td><td>{e.name}</td><td>{ev==="team"?"-":e.org||"-"}</td>
+        <td className="muted">{i+1}</td>
+        <td>{e.name}
+          {e.event==="double"&&e.meta&&e.meta.p1&&<div className="muted" style={{fontSize:11}}>{e.meta.p1.name}({e.meta.p1.div}{e.meta.p1.org?"·"+e.meta.p1.org:""}{e.meta.p1.phone?"·"+e.meta.p1.phone:""}) / {e.meta.p2.name}({e.meta.p2.div}{e.meta.p2.org?"·"+e.meta.p2.org:""}{e.meta.p2.phone?"·"+e.meta.p2.phone:""})</div>}
+          {e.event==="team"&&e.meta&&e.meta.roster&&<div className="muted" style={{fontSize:11}}>{e.meta.roster.map(x=>x.name+"("+x.div+")").join(", ")}</div>}
+        </td>
+        <td>{e.event==="team"?"-":e.org||"-"}</td>
         <td><span className="pill">{e.div}</span></td><td className="muted">{e.phone||"-"}</td>
         <td><button className={"btn btn-sm "+(e.paid?"btn-p":"")} onClick={()=>togglePaid(e)}>{e.paid?"완료":"미납"}</button></td>
         <td><button className="btn btn-sm btn-d" onClick={()=>del(e.id)}>삭제</button></td>
