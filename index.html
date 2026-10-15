@@ -130,10 +130,11 @@ const ADMIN_PW          = "seoulfire";   // 운영진 화면 비밀번호
 const { useState, useEffect } = React;
 const EVENTS = [["single","단식"],["double","복식"],["team","단체전"]];
 const EVLABEL = Object.fromEntries(EVENTS);
+const EVACT=(meta)=>{const a=(meta&&Array.isArray(meta.events)&&meta.events.length)?meta.events:EVENTS.map(e=>e[0]);return EVENTS.filter(e=>a.includes(e[0]));};
 const DIVS = ["1부","2부","3부","4부","5부","6부"];
 const dnum=d=>parseInt(d)||0;
 const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
-const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false};
+const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -273,7 +274,8 @@ function PrelimSheet({state,byId,evLabel}){
 
 /* ---------- 참가 신청 ---------- */
 function Register({entries,reload,meta}){
-  const [ev,setEv]=useState("single"),[dv,setDv]=useState("1부");
+  const [ev,setEv]=useState(()=>(EVACT(meta)[0]||["single"])[0]),[dv,setDv]=useState("1부");
+  useEffect(()=>{const a=EVACT(meta).map(e=>e[0]);if(!a.includes(ev))setEv(a[0]||"single");},[meta.events]);
   const [name,setName]=useState(""),[org,setOrg]=useState(""),[phone,setPhone]=useState("");
   const [p1,setP1]=useState({name:"",org:"",div:"1부",phone:""});
   const [p2,setP2]=useState({name:"",org:"",div:"1부",phone:""});
@@ -322,7 +324,7 @@ function Register({entries,reload,meta}){
     <div className="card">
       <h2>참가 신청</h2>
       {meta&&(meta.closed?<div className="msg msg-no">접수가 마감되었습니다.</div>:<div className="msg" style={{background:"#eff6ff",color:"#1e40af"}}>신청마감 {meta.deadline||"-"} · 참가비 {meta.fee||""}<br/>입금계좌 {meta.account||""}</div>)}
-      <div className="segs">{EVENTS.map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>setEv(k)}>{t}</button>)}</div>
+      <div className="segs">{EVACT(meta).map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>setEv(k)}>{t}</button>)}</div>
 
       {ev==="single"&&<div className="grid">
         <input placeholder="이름" value={name} onChange={e=>setName(e.target.value)}/>
@@ -374,8 +376,9 @@ function Register({entries,reload,meta}){
 }
 
 /* ---------- 대진표 보기 (참가자용) ---------- */
-function PublicView({entries,states,reload}){
-  const [ev,setEv]=useState("single");
+function PublicView({entries,states,reload,meta}){
+  const [ev,setEv]=useState(()=>(EVACT(meta)[0]||["single"])[0]);
+  useEffect(()=>{const a=EVACT(meta).map(e=>e[0]);if(!a.includes(ev))setEv(a[0]||"single");},[meta.events]);
   const st=states[ev]||{}, byId={}; entries.forEach(e=>byId[e.id]=e);
   const divs=divsOf(st); const [dv,setDv]=useState(""); const activeDiv=dv||divs[0]||"";
   const adv=st.advance||2;
@@ -384,7 +387,7 @@ function PublicView({entries,states,reload}){
       <h2 style={{margin:0}}>대진표 보기</h2>
       <button className="btn btn-sm" onClick={reload}>🔄 새로고침</button>
     </div>
-    <div className="segs" style={{marginTop:12}}>{EVENTS.map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>{setEv(k);setDv("");}}>{t}</button>)}</div>
+    <div className="segs" style={{marginTop:12}}>{EVACT(meta).map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>{setEv(k);setDv("");}}>{t}</button>)}</div>
     <h3 style={{marginTop:16}}>예선 리그</h3>
     {(st.groups||[]).length===0?<p className="muted">아직 조 편성 전입니다.</p>:
       <div className="g2">{st.groups.map(g=><div className="scroll" key={g.id}><Matrix group={g} prelim={st.prelim||{}} byId={byId} adv={adv} readOnly/></div>)}</div>}
@@ -407,7 +410,8 @@ function Login({onOk}){
   </div>;
 }
 function Admin({entries,states,setStates,reload,meta}){
-  const [ev,setEv]=useState("single");
+  const [ev,setEv]=useState(()=>(EVACT(meta)[0]||["single"])[0]);
+  useEffect(()=>{const a=EVACT(meta).map(e=>e[0]);if(!a.includes(ev))setEv(a[0]||"single");},[meta.events]);
   const [tab,setTab]=useState("list");
   const [dv,setDv]=useState("");
   const [pmode,setPmode]=useState("prelim");
@@ -430,7 +434,7 @@ function Admin({entries,states,setStates,reload,meta}){
   const del=async(id)=>{if(!confirm("이 참가자를 삭제할까요?"))return;await deleteEntry(id);await reload();};
   const ADMTABS=[["list","신청현황"],["group","조편성·예선"],["knock","본선"],["print","출력"],["set","대회설정"]];
   return (<>
-    <div className="segs no-print">{EVENTS.map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>{setEv(k);setDv("");}}>{t}</button>)}</div>
+    <div className="segs no-print">{EVACT(meta).map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>{setEv(k);setDv("");}}>{t}</button>)}</div>
     <div className="tabs no-print">{ADMTABS.map(([k,t])=><button key={k} className={tab===k?"on":""} onClick={()=>setTab(k)}>{t}</button>)}
       <button className="btn btn-sm" style={{marginLeft:"auto"}} onClick={reload}>🔄 새로고침</button></div>
 
@@ -517,6 +521,11 @@ function Admin({entries,states,setStates,reload,meta}){
       {[["title","대회명"],["date","일시"],["place","장소"],["host","주최·주관"],["fee","참가비"],["account","입금계좌"],["deadline","신청마감"],["contact","문의"]].map(([k,lbl])=>
         <div key={k} style={{marginBottom:8}}><label>{lbl}</label><input value={mf[k]||""} onChange={e=>setMf({...mf,[k]:e.target.value})}/></div>)}
       <div style={{marginBottom:8}}><label>안내사항(공지)</label><textarea value={mf.notice||""} onChange={e=>setMf({...mf,notice:e.target.value})} style={{width:"100%",minHeight:90,border:"1px solid #cbd5e1",borderRadius:8,padding:9,fontSize:14}}/></div>
+      <div style={{margin:"10px 0"}}><label>운영 종목 (체크한 종목만 참가자에게 표시)</label>
+        <div className="row" style={{marginTop:6}}>{EVENTS.map(([k,t])=>{const on=(mf.events||["single","double","team"]).includes(k);
+          return <label key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:14,border:"1px solid #cbd5e1",borderRadius:8,padding:"6px 12px"}}>
+            <input type="checkbox" style={{width:"auto"}} checked={on} onChange={e=>{const cur=mf.events||["single","double","team"];const nx=e.target.checked?[...cur,k]:cur.filter(x=>x!==k);setMf({...mf,events:EVENTS.map(x=>x[0]).filter(x=>nx.includes(x))});}}/>{t}</label>;})}</div>
+      </div>
       <label style={{display:"flex",alignItems:"center",gap:8,margin:"8px 0"}}><input type="checkbox" style={{width:"auto"}} checked={!!mf.closed} onChange={e=>setMf({...mf,closed:e.target.checked})}/> 접수 마감 (신청 화면 잠금)</label>
       <button className="btn btn-p" onClick={()=>saveMeta(mf)}>설정 저장</button>
     </div>}
@@ -539,7 +548,7 @@ function Info({meta}){
       <Row label="일시">{meta.date}</Row>
       <Row label="장소">{meta.place}</Row>
       <Row label="주최·주관">{meta.host}</Row>
-      <Row label="종목">개인단식 · 단체전(기관별, 4인: 단식/복식/단식)</Row>
+      <Row label="종목">{EVACT(meta).map(e=>e[1]).join(" · ")}</Row>
       <Row label="게임방법">예선 3전2선승(조별리그) · 본선 5전3선승(토너먼트)</Row>
       <Row label="참가자격">현 서울소방 직원·전직·가족(직계 존비속) · 의소대원 불가</Row>
       <Row label="참가비">{meta.fee}</Row>
@@ -578,7 +587,7 @@ function App(){
       {loading&&<p className="muted">불러오는 중…</p>}
       {view==="info"&&<Info meta={meta}/>}
       {view==="register"&&<Register entries={entries} reload={reload} meta={meta}/>}
-      {view==="bracket"&&<PublicView entries={entries} states={states} reload={reload}/>}
+      {view==="bracket"&&<PublicView entries={entries} states={states} reload={reload} meta={meta}/>}
       {view==="admin"&&(isAdmin?<Admin entries={entries} states={states} setStates={setStates} reload={reload} meta={meta}/>:<Login onOk={()=>setIsAdmin(true)}/>)}
     </div>
   </>;
