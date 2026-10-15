@@ -186,10 +186,11 @@ async function fetchAll(){
   const states={}; (ts||[]).forEach(r=>states[r.event]=r.data||{});
   return {entries:ent||[],states};
 }
-const saveState=(event,data)=>sb.from('tstate').upsert({event,data,updated_at:new Date().toISOString()});
-const addEntry   =row=>sb.from('entries').insert(row);
-const updateEntry=(id,patch)=>sb.from('entries').update(patch).eq('id',id);
-const deleteEntry=id=>sb.from('entries').delete().eq('id',id);
+const chk=r=>{if(r&&r.error)throw new Error(r.error.message||r.error.hint||r.error.details||"DB 오류");return r;};
+const saveState=async(event,data)=>chk(await sb.from('tstate').upsert({event,data,updated_at:new Date().toISOString()}));
+const addEntry   =async row=>chk(await sb.from('entries').insert(row));
+const updateEntry=async(id,patch)=>chk(await sb.from('entries').update(patch).eq('id',id));
+const deleteEntry=async id=>chk(await sb.from('entries').delete().eq('id',id));
 
 /* ---------- 예선 교차표 ---------- */
 function Matrix({group,prelim,byId,adv,onSet,readOnly}){
@@ -311,7 +312,7 @@ function Register({entries,reload,meta}){
       setP1({name:"",org:"",div:"1부",phone:""});setP2({name:"",org:"",div:"1부",phone:""});
       setTeam({name:"",div:"1부",phone:""});setR([{name:"",div:"1부"},{name:"",div:"1부"},{name:"",div:"1부"},{name:"",div:"1부"}]);
       await reload();
-    }catch(e){setMsg(["no","오류가 발생했습니다. (관리자: DB에 meta 열이 있는지 확인)"]);}
+    }catch(e){setMsg(["no","저장 실패: "+(e&&e.message?e.message:"알 수 없는 오류")]);}
     setBusy(false);
   };
   const hitPhone=e=>{const q=qp.trim();if(!q)return true;const m=e.meta||{};
