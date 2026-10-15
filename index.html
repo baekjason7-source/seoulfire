@@ -425,7 +425,7 @@ function Admin({entries,states,setStates,reload,meta}){
   const tierMap=st.tierMap||{};
   const setTier=(d,v)=>patch({...st,tierMap:{...tierMap,[d]:v}});
   const applyPreset=(m)=>patch({...st,tierMap:m});
-  const draw=()=>patch({...st,groups:makeGroups(evEntries,3,st.tierMap||{}),prelim:{},knockWinners:{},advance:adv});
+  const draw=()=>patch({...st,groups:makeGroups(evEntries,st.groupSize||3,st.tierMap||{}),prelim:{},knockWinners:{},advance:adv});
   const toggleWin=(g,a,b)=>{const key=pKey(g,a,b);const np={...(st.prelim||{})};if(np[key]===a)delete np[key];else np[key]=a;patch({...st,prelim:np});};
   const divs=divsOf(st), activeDiv=dv||divs[0]||"";
   const setKnock=(mid,pid)=>{const r=parseInt(mid.match(/^r(\d+)/)[1]),cur=(st.knockWinners||{})[activeDiv]||{},nw={};
@@ -477,12 +477,16 @@ function Admin({entries,states,setStates,reload,meta}){
         <p className="muted" style={{fontSize:12,margin:"8px 0 0"}}>현재 통합부: {[...new Set(DIVS.map(d=>tierOf(tierMap,d)))].join("  ·  ")}</p>
       </div>
       <div className="card no-print"><div className="row">
+        <label>조당 인원&nbsp;
+          <select value={st.groupSize||3} onChange={e=>patch({...st,groupSize:Number(e.target.value)})}>
+            {[3,4,5,6,7,8].map(nn=><option key={nn} value={nn}>{nn}명</option>)}
+          </select></label>
         <label>본선 진출&nbsp;
           <select value={adv} onChange={e=>patch({...st,advance:Number(e.target.value)})}>
-            <option value={1}>조 1위</option><option value={2}>조 2명</option><option value={3}>전원 통과</option>
+            <option value={1}>조 1위</option><option value={2}>조 2명</option><option value={3}>조 3명</option><option value={4}>조 4명</option><option value={99}>전원 통과</option>
           </select></label>
         <button className="btn btn-p" onClick={draw}>자동 조 편성</button>
-        <span className="muted" style={{fontSize:13}}>통합부별 3명씩 자동 배정 · 교차표에서 결과 입력</span>
+        <span className="muted" style={{fontSize:13}}>통합부별 {st.groupSize||3}명씩 자동 배정 · 교차표에서 결과 입력</span>
       </div></div>
       {(st.groups||[]).length===0?<div className="card"><p className="muted">먼저 조를 편성하세요.</p></div>:
       <div className="g2">{st.groups.map(g=><div className="card" key={g.id}><div className="scroll">
