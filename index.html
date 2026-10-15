@@ -573,8 +573,9 @@ function App(){
   const [states,setStates]=useState({});
   const [loading,setLoading]=useState(true);
   const meta={...DEFAULT_META,...(states["_meta"]||{})};
-  const reload=async()=>{setLoading(true);try{const d=await fetchAll();setEntries(d.entries);setStates(d.states);}catch(e){console.error(e);}setLoading(false);};
+  const reload=async(silent)=>{if(!silent)setLoading(true);try{const d=await fetchAll();setEntries(d.entries);setStates(d.states);}catch(e){console.error(e);}if(!silent)setLoading(false);};
   useEffect(()=>{reload();},[]);
+  useEffect(()=>{const h=()=>{if(typeof document!=="undefined"&&document.visibilityState==="visible")reload(true);};document.addEventListener("visibilitychange",h);window.addEventListener("focus",h);return()=>{document.removeEventListener("visibilitychange",h);window.removeEventListener("focus",h);};},[]);
   const NAV=[["info","대회안내"],["register","참가신청"],["bracket","대진표 보기"],["admin","운영진"]];
   return <>
     <div className="top"><div className="top-in">
