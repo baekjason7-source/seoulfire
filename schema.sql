@@ -40,3 +40,13 @@ drop policy if exists entries_all on entries;
 drop policy if exists tstate_all  on tstate;
 create policy entries_all on entries for all using (true) with check (true);
 create policy tstate_all  on tstate  for all using (true) with check (true);
+
+-- ============================================================
+-- 5) 실시간 반영(선택) — 운영진이 입력하면 다른 기기에 자동 표시
+--    아래를 SQL Editor에서 한 번 실행하세요. (이미 적용돼 있으면 그냥 통과)
+-- ============================================================
+do $$
+begin
+  begin alter publication supabase_realtime add table entries; exception when others then null; end;
+  begin alter publication supabase_realtime add table tstate;  exception when others then null; end;
+end $$;

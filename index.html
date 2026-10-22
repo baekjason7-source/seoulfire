@@ -48,6 +48,8 @@
   .msg{font-size:14px;padding:10px 12px;border-radius:8px;margin-top:10px}
   .msg-ok{background:#ecfdf5;color:#047857}
   .msg-no{background:#fef2f2;color:#b91c1c}
+  .errbar{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+  .errbar button{margin-left:auto;flex:none;border:1px solid #fecaca;background:#fff;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer}
   .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
   .tabs button{border:1px solid #cbd5e1;background:#fff;border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer}
   .tabs button.on{background:#d32f2f;color:#fff;border-color:#d32f2f}
@@ -148,16 +150,25 @@ const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",
 
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
-function makeGroups(entries, size, tierMap){
+const gname=i=>i<26?String.fromCharCode(65+i):String(i+1);
+function makeGroups(entries, size, tierMap, sepOrg){
   const byTier={}; entries.forEach(p=>{const t=tierOf(tierMap,p.div||"1부");(byTier[t]=byTier[t]||[]).push(p);});
   const gnum=s=>{const m=String(s).match(/\d+/);return m?+m[0]:99;};
   const tiers=Object.keys(byTier).sort((A,B)=>gnum(A)-gnum(B));
   const groups=[]; let idx=0;
   tiers.forEach(t=>{
-    const list=[...byTier[t]];
+    let list=[...byTier[t]];
     for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}
-    for(let i=0;i<list.length;i+=size)
-      groups.push({id:`g_${t}_${i}`,name:`${String.fromCharCode(65+idx++)}조`,div:t,members:list.slice(i,i+size).map(p=>p.id)});
+    const nn=list.length, sz=size||3;
+    const ng=Math.max(1,Math.round(nn/sz));            // 조 수를 먼저 정하고 인원을 고르게 나눔(1인 조 방지)
+    if(sepOrg){                                         // 같은 소속은 서로 다른 조로 분산
+      const byOrg={};list.forEach(p=>{const o=((p.org||"-")+"").trim()||"-";(byOrg[o]=byOrg[o]||[]).push(p);});
+      const cl=Object.keys(byOrg).map(k=>byOrg[k]).sort((a,b)=>b.length-a.length);
+      list=[];cl.forEach(c=>c.forEach(p=>list.push(p)));
+    }
+    const buckets=[];for(let i=0;i<ng;i++)buckets.push([]);
+    list.forEach((p,i)=>{const rd=Math.floor(i/ng),k=(rd%2===0)?(i%ng):(ng-1-(i%ng));buckets[k].push(p);});
+    buckets.forEach(b=>{if(!b.length)return;groups.push({id:`g_${t}_${idx}`,name:`${gname(idx)}조`,div:t,members:b.map(p=>p.id)});idx++;});
   });
   return groups;
 }
@@ -209,22 +220,65 @@ const roundName=(i,t)=>{const e=t-i;return e===1?"결승":e===2?"준결승":e===
 const divsOf=st=>{const s=[];(st.groups||[]).forEach(g=>{if(!s.includes(g.div))s.push(g.div);});return s;};
 function advancersOf(st,div,byId){
   const gs=(st.groups||[]).filter(g=>g.div===div),adv=st.advance||2,pr=st.prelim||{},seeds=[];
-  for(let r=0;r<adv;r++)gs.forEach(g=>{const s=standings(g,pr)[r];if(s&&byId[s.id])seeds.push(byId[s.id]);});
+  for(let r=0;r<adv;r++){const order=(r%2===0)?gs:gs.slice().reverse();
+    order.forEach(g=>{const s=standings(g,pr)[r];if(s&&byId[s.id])seeds.push(byId[s.id]);});}
   return seeds;
 }
 function seedsFromSnap(st,div,byId){return ((st.knockSeeds||{})[div]||[]).map(id=>byId[id]).filter(Boolean);}
+function fixSeedClash(seeds,gmap){
+  const nn=seeds.length; if(nn<3)return seeds;
+  const size=nextPow2(nn),pos=seedPositions(size),arr=seeds.slice();
+  const slotsOf=a=>pos.map(p=>a[p-1]||null);
+  const G=p=>p?(gmap[p.id]||""):null;
+  for(let iter=0;iter<60;iter++){
+    const slots=slotsOf(arr);let ci=-1;
+    for(let i=0;i<size;i+=2){const a=slots[i],b=slots[i+1];if(a&&b&&G(a)===G(b)){ci=i;break;}}
+    if(ci<0)break;
+    const a=slots[ci],b=slots[ci+1],ib=arr.indexOf(b);let done=false;
+    for(let j=0;j<size&&!done;j+=2){
+      if(j===ci)continue;
+      const c=slots[j],d=slots[j+1];
+      if(d&&G(d)!==G(a)&&(!c||G(c)!==G(b))){const id=arr.indexOf(d);if(ib>=0&&id>=0){arr[ib]=d;arr[id]=b;done=true;}}
+      else if(c&&G(c)!==G(a)&&(!d||G(d)!==G(b))){const ic=arr.indexOf(c);if(ib>=0&&ic>=0){arr[ib]=c;arr[ic]=b;done=true;}}
+    }
+    if(!done)break;
+  }
+  return arr;
+}
 
 /* ---------- Supabase ---------- */
 const configured = !SUPABASE_URL.includes("YOUR-") && !SUPABASE_ANON_KEY.includes("YOUR-");
 let sb=null; try{ if(configured) sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);}catch(e){}
-async function fetchAll(){
-  const {data:ent}=await sb.from('entries').select('*').order('created_at');
-  const {data:ts}=await sb.from('tstate').select('*');
-  const states={}; (ts||[]).forEach(r=>states[r.event]=r.data||{});
-  return {entries:ent||[],states};
-}
 const chk=r=>{if(r&&r.error)throw new Error(r.error.message||r.error.hint||r.error.details||"DB 오류");return r;};
-const saveState=async(event,data)=>chk(await sb.from('tstate').upsert({event,data,updated_at:new Date().toISOString()}));
+async function fetchAll(){
+  const re=chk(await sb.from('entries').select('*').order('created_at'));
+  const rt=chk(await sb.from('tstate').select('*'));
+  const ts=rt.data||[],states={};
+  const put=e=>{if(!states[e])states[e]={};return states[e];};
+  // 1단계: 종목 기본 상태(구버전 통째 저장분 포함)
+  ts.forEach(r=>{const k=r.event||"";if(k.indexOf('#')>=0)return;const s=put(k),d=r.data||{};Object.assign(s,d);
+    if(d.prelim&&Object.keys(d.prelim).length)s._lp=d.prelim;
+    if(d.knockWinners&&Object.keys(d.knockWinners).length)s._lk=d.knockWinners;});
+  // 2단계: 경기별 저장분이 우선(동시 입력 덮어쓰기 방지)
+  ts.forEach(r=>{const k=r.event||"",i1=k.indexOf('#');if(i1<0)return;
+    const e=k.slice(0,i1),rest=k.slice(i1+1),i2=rest.indexOf('#');if(i2<0)return;
+    const kind=rest.slice(0,i2),id=rest.slice(i2+1),s=put(e),d=r.data||{};
+    if(kind==='r'){s.prelim=s.prelim||{};s.prelim[id]=d;}
+    else if(kind==='k'){const j=id.indexOf('#');if(j<0)return;
+      const dvv=id.slice(0,j),mid=id.slice(j+1);s.knockWinners=s.knockWinners||{};
+      s.knockWinners[dvv]=s.knockWinners[dvv]||{};if(d.w)s.knockWinners[dvv][mid]=d.w;}});
+  return {entries:re.data||[],states};
+}
+// 종목 기본 상태: 경기 결과는 제외하고 저장(경기 결과는 경기별 행으로 따로 저장)
+const saveState=async(event,data)=>{const d={...data};delete d.prelim;delete d.knockWinners;delete d._lp;delete d._lk;
+  return chk(await sb.from('tstate').upsert({event,data:d,updated_at:new Date().toISOString()}));};
+const saveResult=async(ev,mkey,val)=>{const key=ev+'#r#'+mkey;
+  if(val==null)return chk(await sb.from('tstate').delete().eq('event',key));
+  return chk(await sb.from('tstate').upsert({event:key,data:val,updated_at:new Date().toISOString()}));};
+const saveKnockRow=async(ev,dvv,mid,w)=>{const key=ev+'#k#'+dvv+'#'+mid;
+  if(w==null)return chk(await sb.from('tstate').delete().eq('event',key));
+  return chk(await sb.from('tstate').upsert({event:key,data:{w:w},updated_at:new Date().toISOString()}));};
+const delRows=async(keys)=>{if(!keys||!keys.length)return;return chk(await sb.from('tstate').delete().in('event',keys));};
 const addEntry   =async row=>chk(await sb.from('entries').insert(row));
 const updateEntry=async(id,patch)=>chk(await sb.from('entries').update(patch).eq('id',id));
 const deleteEntry=async id=>chk(await sb.from('entries').delete().eq('id',id));
@@ -468,7 +522,7 @@ function Login({onOk}){
     {no&&<div className="msg msg-no">비밀번호가 올바르지 않습니다.</div>}
   </div>;
 }
-function Admin({entries,states,setStates,reload,meta}){
+function Admin({entries,states,setStates,reload,meta,onErr}){
   const [ev,setEv]=useState(()=>(EVACT(meta)[0]||["single"])[0]);
   useEffect(()=>{const a=EVACT(meta).map(e=>e[0]);if(!a.includes(ev))setEv(a[0]||"single");},[meta.events]);
   const [tab,setTab]=useState("list");
@@ -477,26 +531,45 @@ function Admin({entries,states,setStates,reload,meta}){
   const st=states[ev]||{advance:2}, byId={}; entries.forEach(e=>byId[e.id]=e);
   const evEntries=entries.filter(e=>e.event===ev);
   const adv=st.advance||2;
-  const patch=async(nd)=>{setStates(s=>({...s,[ev]:nd}));try{await saveState(ev,nd);}catch(e){console.error(e);}};
+  const fail=e=>{const m=(e&&e.message)||"알 수 없는 오류";if(onErr)onErr("저장 실패: "+m+" — 화면을 새로고침한 뒤 다시 입력하세요.");};
+  const patchLocal=nd=>setStates(s=>({...s,[ev]:nd}));
+  const patch=async(nd)=>{patchLocal(nd);try{await saveState(ev,nd);}catch(e){fail(e);}};
   const [mf,setMf]=useState(meta);
-  const saveMeta=async(nm)=>{setStates(s=>({...s,_meta:nm}));try{await saveState("_meta",nm);}catch(e){}};
+  const saveMeta=async(nm)=>{setStates(s=>({...s,_meta:nm}));try{await saveState("_meta",nm);}catch(e){fail(e);}};
+  const resKeys=()=>Object.keys(st.prelim||{}).map(k=>ev+'#r#'+k);
+  const kwKeys=()=>{const o=[],kw=st.knockWinners||{};Object.keys(kw).forEach(d=>Object.keys(kw[d]||{}).forEach(m=>o.push(ev+'#k#'+d+'#'+m)));return o;};
+  const migRef=React.useRef({});
+  useEffect(()=>{const lp=st._lp,lk=st._lk;if(!lp&&!lk)return;if(migRef.current[ev])return;migRef.current[ev]=1;
+    (async()=>{try{
+      if(lp)for(const k of Object.keys(lp)){const v=lp[k];if(v!=null)await saveResult(ev,k,v);}
+      if(lk)for(const d of Object.keys(lk))for(const m of Object.keys(lk[d]||{}))await saveKnockRow(ev,d,m,lk[d][m]);
+      await saveState(ev,st);await reload(true);
+    }catch(e){}})();},[ev,st._lp,st._lk]);
   const tierMap=st.tierMap||{};
   const setTier=(d,v)=>patch({...st,tierMap:{...tierMap,[d]:v}});
   const applyPreset=(m)=>patch({...st,tierMap:m});
-  const draw=()=>patch({...st,groups:makeGroups(evEntries,st.groupSize||3,st.tierMap||{}),prelim:{},knockWinners:{},advance:adv});
+  const draw=async()=>{const old=resKeys().concat(kwKeys());
+    const nd={...st,groups:makeGroups(evEntries,st.groupSize||3,st.tierMap||{},!!st.sepOrg),prelim:{},knockWinners:{},knockSeeds:{},advance:adv};
+    patchLocal(nd);try{await saveState(ev,nd);if(old.length)await delRows(old);}catch(e){fail(e);}};
   const setScore=(gId,a,b,sa,sb,pa,pb)=>{const np={...(st.prelim||{})},key=pKey(gId,a,b);
     const na=(sa===""||sa==null)?0:parseInt(sa)||0,nb=(sb===""||sb==null)?0:parseInt(sb)||0;
     const npa=(pa===""||pa==null)?null:parseInt(pa)||0,npb=(pb===""||pb==null)?null:parseInt(pb)||0;
-    if(na===0&&nb===0&&npa==null&&npb==null)delete np[key];else np[key]={a:a,b:b,sa:na,sb:nb,pa:npa,pb:npb};
-    patch({...st,prelim:np});};
+    const empty=(na===0&&nb===0&&npa==null&&npb==null),val=empty?null:{a:a,b:b,sa:na,sb:nb,pa:npa,pb:npb};
+    if(empty)delete np[key];else np[key]=val;
+    patchLocal({...st,prelim:np});
+    saveResult(ev,key,val).catch(fail);};
   const divs=divsOf(st), activeDiv=dv||divs[0]||"";
-  const setKnock=(mid,pid)=>{const r=parseInt(mid.match(/^r(\d+)/)[1]),cur=(st.knockWinners||{})[activeDiv]||{},nw={};
-    Object.keys(cur).forEach(k=>{if(parseInt(k.match(/^r(\d+)/)[1])<=r)nw[k]=cur[k];});nw[mid]=pid;
-    patch({...st,knockWinners:{...(st.knockWinners||{}),[activeDiv]:nw}});};
-  const genKnock=()=>{const seeds={};divsOf(st).forEach(d=>{seeds[d]=advancersOf(st,d,byId).map(p=>p.id);});patch({...st,knockSeeds:seeds,knockWinners:{}});};
+  const setKnock=(mid,pid)=>{const r=parseInt(mid.match(/^r(\d+)/)[1]),cur=(st.knockWinners||{})[activeDiv]||{},nw={},drop=[];
+    Object.keys(cur).forEach(k=>{if(parseInt(k.match(/^r(\d+)/)[1])<=r)nw[k]=cur[k];else drop.push(ev+'#k#'+activeDiv+'#'+k);});nw[mid]=pid;
+    patchLocal({...st,knockWinners:{...(st.knockWinners||{}),[activeDiv]:nw}});
+    (async()=>{try{await saveKnockRow(ev,activeDiv,mid,pid);if(drop.length)await delRows(drop);}catch(e){fail(e);}})();};
+  const genKnock=async()=>{const gmap={};(st.groups||[]).forEach(g=>(g.members||[]).forEach(m=>gmap[m]=g.id));
+    const seeds={};divsOf(st).forEach(d=>{seeds[d]=fixSeedClash(advancersOf(st,d,byId),gmap).map(p=>p.id);});
+    const old=kwKeys(),nd={...st,knockSeeds:seeds,knockWinners:{}};
+    patchLocal(nd);try{await saveState(ev,nd);if(old.length)await delRows(old);}catch(e){fail(e);}};
   const togglePub=()=>patch({...st,published:!st.published});
-  const togglePaid=async(e)=>{await updateEntry(e.id,{paid:!e.paid});await reload();};
-  const del=async(id)=>{if(!confirm("이 참가자를 삭제할까요?"))return;await deleteEntry(id);await reload();};
+  const togglePaid=async(e)=>{try{await updateEntry(e.id,{paid:!e.paid});await reload(true);}catch(er){fail(er);}};
+  const del=async(id)=>{if(!confirm("이 참가자를 삭제할까요?"))return;try{await deleteEntry(id);await reload(true);}catch(e){fail(e);}};
   const ADMTABS=[["list","신청현황"],["group","조편성·예선"],["knock","본선"],["print","출력"],["set","대회설정"]];
   return (<>
     <div className="segs no-print">{EVACT(meta).map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>{setEv(k);setDv("");}}>{t}</button>)}</div>
@@ -549,12 +622,13 @@ function Admin({entries,states,setStates,reload,meta}){
           <select value={st.bo||3} onChange={e=>patch({...st,bo:Number(e.target.value)})}>
             <option value={3}>3전2승</option><option value={5}>5전3승</option>
           </select></label>
+        <label style={{display:"flex",alignItems:"center",gap:4}}><input type="checkbox" style={{width:"auto"}} checked={!!st.sepOrg} onChange={e=>patch({...st,sepOrg:e.target.checked})}/> 같은 소속 분리</label>
         <label>본선 진출&nbsp;
           <select value={adv} onChange={e=>patch({...st,advance:Number(e.target.value)})}>
             <option value={1}>조 1위</option><option value={2}>조 2명</option><option value={3}>조 3명</option><option value={4}>조 4명</option><option value={99}>전원 통과</option>
           </select></label>
         <button className="btn btn-p" onClick={draw}>자동 조 편성</button>
-        <span className="muted" style={{fontSize:13}}>통합부별 {st.groupSize||3}명씩 자동 배정 · 교차표에서 결과 입력</span>
+        <span className="muted" style={{fontSize:13}}>통합부별 {st.groupSize||3}명 기준으로 고르게 배정(1인 조 없음)</span>
       </div></div>
       {(st.groups||[]).length===0?<div className="card"><p className="muted">먼저 조를 편성하세요.</p></div>:
       <div className="g2">{st.groups.map(g=><div className="card" key={g.id}><div className="scroll">
@@ -651,10 +725,19 @@ function App(){
   const [entries,setEntries]=useState([]);
   const [states,setStates]=useState({});
   const [loading,setLoading]=useState(true);
+  const [err,setErr]=useState("");
   const meta={...DEFAULT_META,...(states["_meta"]||{})};
-  const reload=async(silent)=>{if(!silent)setLoading(true);try{const d=await fetchAll();setEntries(d.entries);setStates(d.states);}catch(e){console.error(e);}if(!silent)setLoading(false);};
+  const reload=async(silent)=>{if(!silent)setLoading(true);
+    try{const d=await fetchAll();setEntries(d.entries);setStates(d.states);setErr("");}
+    catch(e){setErr("데이터 불러오기 실패: "+((e&&e.message)||"")+" — 인터넷 연결을 확인하세요.");}
+    if(!silent)setLoading(false);};
   useEffect(()=>{reload();},[]);
   useEffect(()=>{const h=()=>{if(typeof document!=="undefined"&&document.visibilityState==="visible")reload(true);};document.addEventListener("visibilitychange",h);window.addEventListener("focus",h);return()=>{document.removeEventListener("visibilitychange",h);window.removeEventListener("focus",h);};},[]);
+  useEffect(()=>{if(!sb)return;let t=null,ch=null;const bump=()=>{clearTimeout(t);t=setTimeout(()=>reload(true),700);};
+    try{ch=sb.channel('tt-live')
+      .on('postgres_changes',{event:'*',schema:'public',table:'tstate'},bump)
+      .on('postgres_changes',{event:'*',schema:'public',table:'entries'},bump).subscribe();}catch(e){}
+    return()=>{clearTimeout(t);try{if(ch)sb.removeChannel(ch);}catch(e){}};},[]);
   const NAV=[["info","대회안내"],["register","참가신청"],["bracket","대진표 보기"],["admin","운영진"]];
   return <>
     <div className="top"><div className="top-in">
@@ -664,11 +747,12 @@ function App(){
     <div className="nav no-print">{NAV.map(([k,t])=><button key={k} className={view===k?"on":""} onClick={()=>setView(k)}>{t}</button>)}</div>
     </div>
     <div className="wrap">
+      {err&&<div className="errbar no-print"><span>⚠️ {err}</span><button onClick={()=>setErr("")}>닫기</button></div>}
       {loading&&<p className="muted">불러오는 중…</p>}
       {view==="info"&&<Info meta={meta}/>}
       {view==="register"&&<Register entries={entries} reload={reload} meta={meta}/>}
       {view==="bracket"&&<PublicView entries={entries} states={states} reload={reload} meta={meta}/>}
-      {view==="admin"&&(isAdmin?<Admin entries={entries} states={states} setStates={setStates} reload={reload} meta={meta}/>:<Login onOk={()=>setIsAdmin(true)}/>)}
+      {view==="admin"&&(isAdmin?<Admin entries={entries} states={states} setStates={setStates} reload={reload} meta={meta} onErr={setErr}/>:<Login onOk={()=>setIsAdmin(true)}/>)}
     </div>
   </>;
 }
