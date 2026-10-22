@@ -131,12 +131,15 @@
 ============================================================ */
 const SUPABASE_URL      = "https://kqoosiswimbdksmisjxj.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_uzQUa9PHFOn7XxkaPWAgGQ_fQUrGkpl";
-const ADMIN_PW          = "seoulfire";   // 운영진 화면 비밀번호
+const ADMIN_PW_HASH     = "a402b1c72699c406b8bddb66333bf6a8d027b88c6b76afb1c7afc928333ecc59"; // 운영진 비밀번호의 암호화(SHA-256) 값. 평문은 소스에 없음.
+// 비밀번호를 바꾸려면: 브라우저 콘솔(F12)에서 아래 한 줄 실행 후 나온 값을 위 ADMIN_PW_HASH에 붙여넣기
+//   crypto.subtle.digest('SHA-256',new TextEncoder().encode('새비밀번호')).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))
 /* ============================================================ */
 
 const { useState, useEffect } = React;
 const EVENTS = [["single","단식"],["double","복식"],["team","단체전"]];
 const EVLABEL = Object.fromEntries(EVENTS);
+async function sha256hex(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 const EVACT=(meta)=>{const a=(meta&&Array.isArray(meta.events)&&meta.events.length)?meta.events:EVENTS.map(e=>e[0]);return EVENTS.filter(e=>a.includes(e[0]));};
 const DIVS = ["1부","2부","3부","4부","5부","6부"];
 const dnum=d=>parseInt(d)||0;
@@ -456,11 +459,12 @@ function PublicView({entries,states,reload,meta}){
 
 /* ---------- 운영진 ---------- */
 function Login({onOk}){
-  const [pw,setPw]=useState(""),[no,setNo]=useState(false);
+  const [pw,setPw]=useState(""),[no,setNo]=useState(false),[busy,setBusy]=useState(false);
+  const check=async()=>{setBusy(true);try{const h=await sha256hex(pw);if(h===ADMIN_PW_HASH){setNo(false);onOk();}else setNo(true);}catch(e){setNo(true);}setBusy(false);};
   return <div className="card" style={{maxWidth:360,margin:"20px auto"}}>
     <h2>운영진 로그인</h2>
-    <input type="password" placeholder="비밀번호" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&(pw===ADMIN_PW?onOk():setNo(true))}/>
-    <div style={{marginTop:10}}><button className="btn btn-p" onClick={()=>pw===ADMIN_PW?onOk():setNo(true)}>입장</button></div>
+    <input type="password" placeholder="비밀번호" value={pw} onChange={e=>{setPw(e.target.value);setNo(false);}} onKeyDown={e=>e.key==="Enter"&&check()}/>
+    <div style={{marginTop:10}}><button className="btn btn-p" disabled={busy} onClick={check}>{busy?"확인 중…":"입장"}</button></div>
     {no&&<div className="msg msg-no">비밀번호가 올바르지 않습니다.</div>}
   </div>;
 }
