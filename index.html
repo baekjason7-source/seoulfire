@@ -151,7 +151,20 @@ const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
 const gname=i=>i<26?String.fromCharCode(65+i):String(i+1);
-function makeGroups(entries, size, tierMap, sepOrg){
+function tierCounts(entries,tierMap){const c={};entries.forEach(p=>{const t=tierOf(tierMap,p.div||"1부");c[t]=(c[t]||0)+1;});return c;}
+const gnumT=s=>{const m=String(s).match(/\d+/);return m?+m[0]:99;};
+function tierList(entries,tierMap){const c=tierCounts(entries,tierMap);return Object.keys(c).sort((A,B)=>gnumT(A)-gnumT(B)||A.localeCompare(B)).map(t=>({t,n:c[t]}));}
+function maxGroupsFor(n){return Math.max(1,Math.floor(n/2));}               // 조당 최소 2명(1인 조 금지)
+function defaultGroupsFor(n,size){return Math.min(maxGroupsFor(n),Math.max(1,Math.round(n/(size||3))));}
+function groupCountOf(counts,t,n,size){const v=counts&&counts[t];return v?Math.min(maxGroupsFor(n),Math.max(1,v)):defaultGroupsFor(n,size);}
+/* 탁구대 수(기본 12) 안에서 부별 신청인원에 비례해 조 수 자동 배분 — 조당 3명 이상 유지 */
+function autoAllocGroups(list,tables){
+  const T=tables||12,out={};list.forEach(x=>out[x.t]=1);let used=list.length;
+  const cap=x=>Math.max(1,Math.floor(x.n/3));
+  while(used<T){let best=null,bv=-1;list.forEach(x=>{if(out[x.t]>=cap(x))return;const v=x.n/out[x.t];if(v>bv){bv=v;best=x;}});if(!best)break;out[best.t]++;used++;}
+  return out;
+}
+function makeGroups(entries, size, tierMap, sepOrg, counts, tables){
   const byTier={}; entries.forEach(p=>{const t=tierOf(tierMap,p.div||"1부");(byTier[t]=byTier[t]||[]).push(p);});
   const gnum=s=>{const m=String(s).match(/\d+/);return m?+m[0]:99;};
   const tiers=Object.keys(byTier).sort((A,B)=>gnum(A)-gnum(B));
@@ -160,7 +173,7 @@ function makeGroups(entries, size, tierMap, sepOrg){
     let list=[...byTier[t]];
     for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}
     const nn=list.length, sz=size||3;
-    const ng=Math.max(1,Math.round(nn/sz));            // 조 수를 먼저 정하고 인원을 고르게 나눔(1인 조 방지)
+    const ng=groupCountOf(counts,t,nn,sz);              // 부별로 지정한 조 수(미지정 시 조당 인원 기준) — 인원 고르게 배분, 1인 조 방지
     if(sepOrg){                                         // 같은 소속은 서로 다른 조로 분산
       const byOrg={};list.forEach(p=>{const o=((p.org||"-")+"").trim()||"-";(byOrg[o]=byOrg[o]||[]).push(p);});
       const cl=Object.keys(byOrg).map(k=>byOrg[k]).sort((a,b)=>b.length-a.length);
@@ -168,9 +181,36 @@ function makeGroups(entries, size, tierMap, sepOrg){
     }
     const buckets=[];for(let i=0;i<ng;i++)buckets.push([]);
     list.forEach((p,i)=>{const rd=Math.floor(i/ng),k=(rd%2===0)?(i%ng):(ng-1-(i%ng));buckets[k].push(p);});
-    buckets.forEach(b=>{if(!b.length)return;groups.push({id:`g_${t}_${idx}`,name:`${gname(idx)}조`,div:t,members:b.map(p=>p.id)});idx++;});
+    buckets.forEach(b=>{if(!b.length)return;groups.push({id:`g_${t}_${idx}`,name:`${gname(idx)}조`,div:t,table:(idx%(tables||12))+1,members:b.map(p=>p.id)});idx++;});
   });
   return groups;
+}
+/* 예선 경기 순서 — 같은 선수가 연달아 뛰지 않도록 배치(조 편성마다 고정) */
+function lexLess(a,b){for(let i=0;i<a.length;i++){if(a[i]<b[i])return true;if(a[i]>b[i])return false;}return false;}
+function matchOrder(ids,seedStr){
+  const n=ids.length;if(n<2)return [];
+  const all=[];for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)all.push([i,j]);
+  let h=2166136261;String(seedStr||ids.join("")).split("").forEach(c=>{h^=c.charCodeAt(0);h=Math.imul(h,16777619);});
+  const rnd=()=>{h^=h<<13;h^=h>>>17;h^=h<<5;return ((h>>>0)%100000)/100000;};
+  let best=null,bs=null;
+  for(let t=0;t<300;t++){
+    const left=all.slice(),seq=[],last=Array(n).fill(-9),cnt=Array(n).fill(0);
+    while(left.length){
+      let bi=-1,bv=null;
+      left.forEach((m,k)=>{const [a,b]=m,prev=seq.length?seq[seq.length-1]:null;
+        const back=prev&&(prev.includes(a)||prev.includes(b))?1:0;
+        const rest=Math.min(seq.length-last[a],seq.length-last[b]);
+        const v=[back,-rest,cnt[a]+cnt[b],t?rnd():k];
+        if(!bv||lexLess(v,bv)){bv=v;bi=k;}});
+      const m=left.splice(bi,1)[0];last[m[0]]=last[m[1]]=seq.length;cnt[m[0]]++;cnt[m[1]]++;seq.push(m);
+    }
+    let back=0,minRest=99;const lp=Array(n).fill(-9);
+    seq.forEach((m,k)=>{m.forEach(p=>{if(lp[p]>=0){const g=k-lp[p];if(g===1)back++;if(g<minRest)minRest=g;}lp[p]=k;});});
+    const sc=[back,-minRest];
+    if(!bs||lexLess(sc,bs)){bs=sc;best=seq;}
+    if(back===0&&minRest>=2&&n>=5)break;
+  }
+  return best.map(([i,j])=>[ids[i],ids[j]]);
 }
 function roundRobin(ids){const r=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)r.push([ids[i],ids[j]]);return r;}
 const pKey=(g,a,b)=>`${g}|${[a,b].sort().join("~")}`;
@@ -289,11 +329,11 @@ function Matrix({group,prelim,byId,adv,onScore,bo,readOnly}){
   const st=standings(group,prelim);
   const rankOf=id=>st.findIndex(s=>s.id===id)+1;
   const rec=id=>st.find(s=>s.id===id)||{win:0,loss:0,played:0,sw:0,sl:0};
-  const pairs=[];for(let i=0;i<members.length;i++)for(let j=i+1;j<members.length;j++)pairs.push([members[i],members[j]]);
+  const pairs=matchOrder(members.map(m=>m.id),group.id).map(([a,b])=>[byId[a],byId[b]]);
   return (<>
     <table className="mx">
       <thead><tr>
-        <th className="corner">{group.name}<br/>{group.div}</th>
+        <th className="corner">{group.name}<br/>{group.div}{group.table?<><br/><span style={{fontSize:11,color:"#d32f2f"}}>{group.table}번 탁구대</span></>:null}</th>
         {members.map(m=><th className="mx-h" key={m.id}>{m.name}<span>{m.div}{m.org?" · "+m.org:""}</span></th>)}
         <th>승-패</th><th>세트</th><th>순위</th>
       </tr></thead>
@@ -355,7 +395,7 @@ function PrelimSheet({state,byId,evLabel}){
       <div className="sheet-h">
         <div className="sheet-g">{g.name}</div>
         <div className="sheet-t">{evLabel} · {g.div} 예선 결과지<small>각 칸에 이긴 게임(세트) 수 기록 · 부수 차이만큼 약자가 핸디(선취점) 적용 · 동점 시 득·실로 순위 판정</small></div>
-        <div className="sheet-tb">탁구대<br/>______</div>
+        <div className="sheet-tb">탁구대<br/>{g.table?<b style={{fontSize:20,color:"#111"}}>{g.table}</b>:"______"}</div>
       </div>
       <table className="pmx">
         <thead><tr>
@@ -374,7 +414,7 @@ function PrelimSheet({state,byId,evLabel}){
         </tbody>
       </table>
       <div className="smatch"><b style={{fontSize:12}}>경기 순서</b>
-        {(()=>{const rows=[];for(let i=0;i<members.length;i++)for(let j=i+1;j<members.length;j++)rows.push([members[i],members[j]]);return rows.map((pr,k)=>(<div className="mrow" key={k}><span className="pn r">{k+1}. {pr[0].name}</span><span className="sets">{[1,2,3,4,5].map(s=><span className="sb" key={s}><i>{s}세트</i></span>)}</span><span className="pn">{pr[1].name}</span></div>));})()}
+        {(()=>{const rows=matchOrder(members.map(m=>m.id),g.id).map(([a,b])=>[byId[a],byId[b]]);return rows.map((pr,k)=>(<div className="mrow" key={k}><span className="pn r">{k+1}. {pr[0].name}</span><span className="sets">{[1,2,3,4,5].map(s=><span className="sb" key={s}><i>{s}세트</i></span>)}</span><span className="pn">{pr[1].name}</span></div>));})()}
       </div>
     </div>;
   })}</div>;
@@ -549,7 +589,10 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
   const setTier=(d,v)=>patch({...st,tierMap:{...tierMap,[d]:v}});
   const applyPreset=(m)=>patch({...st,tierMap:m});
   const draw=async()=>{const old=resKeys().concat(kwKeys());
-    const nd={...st,groups:makeGroups(evEntries,st.groupSize||3,st.tierMap||{},!!st.sepOrg),prelim:{},knockWinners:{},knockSeeds:{},advance:adv};
+    const tl=tierList(evEntries,st.tierMap||{}),tot=tl.reduce((a,x)=>a+groupCountOf(st.groupCounts,x.t,x.n,st.groupSize||3),0),T=st.tables||12;
+    if(tot>T&&!confirm(`조 수 합계 ${tot}개가 탁구대 ${T}대를 초과합니다.\n${T+1}번째 조부터는 탁구대를 이어서 사용(${T}대 순환 배정)하게 됩니다. 계속할까요?`))return;
+    if((st.groups||[]).length&&Object.keys(st.prelim||{}).length&&!confirm("이미 입력된 예선 결과가 모두 지워집니다. 다시 편성할까요?"))return;
+    const nd={...st,groups:makeGroups(evEntries,st.groupSize||3,st.tierMap||{},!!st.sepOrg,st.groupCounts||{},T),prelim:{},knockWinners:{},knockSeeds:{},advance:adv};
     patchLocal(nd);try{await saveState(ev,nd);if(old.length)await delRows(old);}catch(e){fail(e);}};
   const setScore=(gId,a,b,sa,sb,pa,pb)=>{const np={...(st.prelim||{})},key=pKey(gId,a,b);
     const na=(sa===""||sa==null)?0:parseInt(sa)||0,nb=(sb===""||sb==null)?0:parseInt(sb)||0;
@@ -628,8 +671,30 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
             <option value={1}>조 1위</option><option value={2}>조 2명</option><option value={3}>조 3명</option><option value={4}>조 4명</option><option value={99}>전원 통과</option>
           </select></label>
         <button className="btn btn-p" onClick={draw}>자동 조 편성</button>
-        <span className="muted" style={{fontSize:13}}>통합부별 {st.groupSize||3}명 기준으로 고르게 배정(1인 조 없음)</span>
-      </div></div>
+      </div>
+      {(()=>{const tl=tierList(evEntries,tierMap),T=st.tables||12,gc=st.groupCounts||{},sz=st.groupSize||3;
+        const rows=tl.map(x=>{const g=groupCountOf(gc,x.t,x.n,sz),lo=Math.floor(x.n/g),hi=Math.ceil(x.n/g);return {...x,g,lo,hi,max:maxGroupsFor(x.n)};});
+        const tot=rows.reduce((a,x)=>a+x.g,0),over=tot>T;
+        const setG=(t,v)=>patch({...st,groupCounts:{...gc,[t]:Math.max(1,Number(v)||1)}});
+        if(!rows.length)return <p className="muted" style={{fontSize:13,marginTop:10}}>신청자가 없습니다.</p>;
+        return <div style={{marginTop:12,borderTop:"1px solid #eef2f7",paddingTop:10}}>
+          <div className="row" style={{gap:8,marginBottom:8}}>
+            <b style={{fontSize:14}}>부별 조 수 지정</b>
+            <label style={{fontSize:13}}>탁구대&nbsp;<input type="number" min="1" max="40" value={T} onChange={e=>patch({...st,tables:Math.max(1,Number(e.target.value)||12)})} style={{width:60,padding:"4px 6px"}}/>대</label>
+            <button className="btn btn-sm btn-p" onClick={()=>patch({...st,groupCounts:autoAllocGroups(tl,T)})}>탁구대 {T}대에 맞춰 자동 배분</button>
+            <button className="btn btn-sm" onClick={()=>patch({...st,groupCounts:{}})}>조당 {sz}명 기준으로 초기화</button>
+          </div>
+          <table style={{maxWidth:520}}><thead><tr><th>통합부</th><th>신청 인원</th><th>조 수</th><th>조당 인원</th></tr></thead>
+          <tbody>{rows.map(x=><tr key={x.t}>
+            <td><span className="pill">{x.t}</span></td><td>{x.n}명</td>
+            <td><input type="number" min="1" max={x.max} value={x.g} onChange={e=>setG(x.t,e.target.value)} style={{width:64,padding:"4px 6px"}}/></td>
+            <td className={x.lo<3?"":"muted"} style={x.lo<3?{color:"#d32f2f",fontWeight:600}:null}>{x.lo===x.hi?x.lo+"명":x.lo+"~"+x.hi+"명"}{x.lo<3?" (3명 미만 조 발생)":""}</td>
+          </tr>)}
+          <tr><th>합계</th><th>{rows.reduce((a,x)=>a+x.n,0)}명</th><th style={{color:over?"#d32f2f":"#047857"}}>{tot}개 / {T}대</th><th style={{fontSize:12,color:over?"#d32f2f":"#047857"}}>{over?`탁구대 ${tot-T}대 부족`:"탁구대 수 이내"}</th></tr>
+          </tbody></table>
+          <p className="muted" style={{fontSize:12,margin:"6px 0 0"}}>조 수를 바꾼 뒤 [자동 조 편성]을 눌러야 반영됩니다. 조 순서대로 1~{T}번 탁구대가 배정됩니다.</p>
+        </div>;})()}
+      </div>
       {(st.groups||[]).length===0?<div className="card"><p className="muted">먼저 조를 편성하세요.</p></div>:
       <div className="g2">{st.groups.map(g=><div className="card" key={g.id}><div className="scroll">
         <Matrix group={g} prelim={st.prelim||{}} byId={byId} adv={adv} onScore={setScore} bo={st.bo||3}/>
