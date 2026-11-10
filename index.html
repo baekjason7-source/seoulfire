@@ -161,7 +161,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-10e";
+const BUILD="2026-11-10f";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -293,13 +293,21 @@ function buildRounds(seeds,winners){
 }
 const roundName=(i,t)=>{const e=t-i;return e===1?"결승":e===2?"준결승":e===3?"8강":e===4?"16강":`${i+1}라운드`;};
 const divsOf=st=>{const s=[];(st.groups||[]).forEach(g=>{if(!s.includes(g.div))s.push(g.div);});return s;};
+/* 조 예선 완료 여부 — 모든 대진에 승자가 있어야 완료 */
+function liveGroup(g,byId){return {...g,members:(g.members||[]).filter(id=>byId[id])};}
+function groupDone(g,pr){const ids=g.members;if(ids.length<2)return true;
+  for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const r=matchRes(pr,g.id,ids[i],ids[j]);if(!r||!r.win)return false;}return true;}
+const phSeed=(g,r)=>({id:`@${g.id}@${r}`,name:`${g.name} ${r+1}위`,ph:true});
 function advancersOf(st,div,byId){
-  const gs=(st.groups||[]).filter(g=>g.div===div),adv=st.advance||2,pr=st.prelim||{},seeds=[];
+  const gs=(st.groups||[]).filter(g=>g.div===div).map(g=>liveGroup(g,byId)),adv=st.advance||2,pr=st.prelim||{},seeds=[];
   for(let r=0;r<adv;r++){const order=(r%2===0)?gs:gs.slice().reverse();
-    order.forEach(g=>{const s=standings(g,pr)[r];if(s&&byId[s.id])seeds.push(byId[s.id]);});}
+    order.forEach(g=>{if(r>=g.members.length)return;
+      if(!groupDone(g,pr)){seeds.push(phSeed(g,r));return;}   // 예선 미완료 조: 이름 대신 'A조 1위' 자리표시
+      const s=standings(g,pr)[r];if(s&&byId[s.id])seeds.push(byId[s.id]);});}
   return seeds;
 }
-function seedsFromSnap(st,div,byId){return ((st.knockSeeds||{})[div]||[]).map(id=>byId[id]).filter(Boolean);}
+function seedsFromSnap(st,div,byId){const gs={};(st.groups||[]).forEach(g=>gs[g.id]=g);
+  return ((st.knockSeeds||{})[div]||[]).map(id=>{if(String(id)[0]==="@"){const [,gid,r]=String(id).split("@");const g=gs[gid];return g?phSeed(g,+r):null;}return byId[id];}).filter(Boolean);}
 function fixSeedClash(seeds,gmap){
   const nn=seeds.length; if(nn<3)return seeds;
   const size=nextPow2(nn),pos=seedPositions(size),arr=seeds.slice();
@@ -412,8 +420,8 @@ function Bracket({rounds,winners,onPick,readOnly}){
     {rounds.map((round,ri)=>(
       <div className="brk-col" key={ri}><p>{roundName(ri,t)}</p>
         {round.map(m=>{const w=matchWinner(m,winners);
-          const Side=({pl})=>(<button disabled={readOnly||!pl} className={w&&pl&&w.id===pl.id?"w":""}
-            onClick={()=>pl&&onPick&&onPick(m.id,pl.id)}>{pl?pl.name:<span className="muted">부전승</span>}</button>);
+          const Side=({pl})=>(<button disabled={readOnly||!pl||pl.ph} className={w&&pl&&w.id===pl.id?"w":""}
+            onClick={()=>pl&&!pl.ph&&onPick&&onPick(m.id,pl.id)}>{pl?(pl.ph?<span style={{color:"#64748b"}}>{pl.name}</span>:pl.name):<span className="muted">부전승</span>}</button>);
           return <div className="brk-m" key={m.id}><Side pl={m.a}/><Side pl={m.b}/></div>;})}
       </div>))}
     {champ&&<div style={{display:"flex",flexDirection:"column",justifyContent:"center"}}><p style={{fontSize:12,color:"#94a3b8",textAlign:"center"}}>우승</p><div className="champ">🏆 {champ.name}</div></div>}
@@ -651,7 +659,9 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
     Object.keys(cur).forEach(k=>{if(parseInt(k.match(/^r(\d+)/)[1])<=r)nw[k]=cur[k];else drop.push(ev+'#k#'+activeDiv+'#'+k);});nw[mid]=pid;
     patchLocal({...st,knockWinners:{...(st.knockWinners||{}),[activeDiv]:nw}});
     (async()=>{try{await saveKnockRow(ev,activeDiv,mid,pid);if(drop.length)await delRows(drop);}catch(e){fail(e);}})();};
-  const genKnock=async()=>{const gmap={};(st.groups||[]).forEach(g=>(g.members||[]).forEach(m=>gmap[m]=g.id));
+  const genKnock=async()=>{const gmap={};(st.groups||[]).forEach(g=>{(g.members||[]).forEach(m=>gmap[m]=g.id);for(let r=0;r<10;r++)gmap[`@${g.id}@${r}`]=g.id;});
+    const undone=(st.groups||[]).filter(g=>!groupDone(liveGroup(g,byId),st.prelim||{}));
+    if(undone.length&&!confirm(`예선이 끝나지 않은 조 ${undone.length}개가 있습니다.\n해당 자리는 이름 대신 'A조 1위'처럼 표시됩니다.\n예선이 모두 끝난 뒤 [본선 대진 생성]을 다시 누르면 이름이 채워집니다. 계속할까요?`))return;
     const seeds={};divsOf(st).forEach(d=>{seeds[d]=fixSeedClash(advancersOf(st,d,byId),gmap).map(p=>p.id);});
     const old=kwKeys(),nd={...st,knockSeeds:seeds,knockWinners:{}};
     patchLocal(nd);try{await saveState(ev,nd);if(old.length)await delRows(old);}catch(e){fail(e);}};
@@ -748,6 +758,18 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
           {bad.length?<><b style={{color:"#d32f2f"}}>같은 소속 중복 {bad.length}개 조</b> <span className="muted" style={{fontSize:12}}>(해당 부 조 수보다 같은 소속 인원이 많으면 불가피 — [자동 조 편성] 재실행 또는 조 수 조정)</span>
             <ul style={{margin:"6px 0 0",paddingLeft:18,fontSize:13}}>{bad.map(x=><li key={x.g.id}>{x.g.div} {x.g.name}: {x.d.join(", ")}</li>)}</ul></>
           :<b style={{color:"#047857"}}>✓ 같은 소속 중복 없음</b>}</div>;})()}
+      {(()=>{const inG=new Set(st.groups.flatMap(g=>g.members||[])),un=evEntries.filter(e=>!inG.has(e.id));
+        if(!un.length)return null;
+        const addTo=(eid,gid)=>{if(!gid)return;const g=st.groups.find(x=>x.id===gid),p=byId[eid];
+          if(!confirm(`${p.name} 님을 ${g.div} ${g.name}에 추가할까요?\n(이 조의 경기 순서가 새 인원 기준으로 다시 정해지며, 이미 입력한 결과는 유지됩니다)`))return;
+          patch({...st,groups:st.groups.map(x=>x.id===gid?{...x,members:[...x.members,eid]}:x)});};
+        return <div className="card no-print" style={{borderLeft:"4px solid #d97706"}}>
+          <b style={{color:"#b45309"}}>조 미배정 참가자 {un.length}명</b> <span className="muted" style={{fontSize:12}}>(조 편성 이후 신청·추가된 인원 — 조를 골라 [조에 추가]하면 기존 편성·결과는 그대로 두고 해당 조에만 들어갑니다)</span>
+          <table style={{marginTop:6}}><tbody>{un.map(e=>{const t=tierOf(tierMap,e.div||"1부"),cand=st.groups.filter(g=>g.div===t).sort((a,b)=>a.members.length-b.members.length),opts=cand.length?cand:st.groups;
+            return <tr key={e.id}><td style={{whiteSpace:"nowrap"}}><b>{e.name}</b> <span className="muted" style={{fontSize:12}}>{e.div}{e.org?" · "+e.org:""}</span></td>
+              <td><select id={"ua_"+e.id} defaultValue={opts[0]?opts[0].id:""} style={{padding:"5px 8px",fontSize:13}}>{opts.map(g=><option key={g.id} value={g.id}>{g.div} {g.name} ({g.members.length}명)</option>)}</select></td>
+              <td><button className="btn btn-sm btn-p" onClick={()=>addTo(e.id,document.getElementById("ua_"+e.id).value)}>조에 추가</button></td></tr>;})}</tbody></table>
+        </div>;})()}
       <div className="g2">{st.groups.map(g=><div className="card" key={g.id}><div className="scroll">
         <Matrix group={g} prelim={st.prelim||{}} byId={byId} adv={adv} onScore={setScore} bo={st.bo||3}/>
       </div></div>)}</div></>}
@@ -760,7 +782,7 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
           <button className={"btn "+(st.published?"":"btn-p")} onClick={togglePub}>{st.published?"비공개로 전환":"대진표 공개(확정)"}</button>
           <span style={{fontSize:12,color:st.published?"#047857":"#94a3b8"}}>{st.published?"● 참가자에게 공개 중":"○ 비공개 (참가자는 '확정 전' 표시)"}</span>
         </div>
-        <p className="muted" style={{fontSize:12,marginTop:0}}>예선 순위대로 각 조 상위자가 다른 조 하위자와 맞붙도록 자동 배치. 인원수에 따라 상위 시드는 1회전 부전승 가능. 예선 결과를 수정했으면 [본선 대진 생성]을 다시 누르세요.</p>
+        <p className="muted" style={{fontSize:12,marginTop:0}}>예선 순위대로 각 조 상위자가 다른 조 하위자와 맞붙도록 자동 배치. 인원수에 따라 상위 시드는 1회전 부전승 가능. 예선이 끝나지 않은 조는 「A조 1위」처럼 자리만 표시됩니다. 예선 종료 후 또는 결과를 수정했으면 [본선 대진 생성]을 다시 누르세요.</p>
         <div className="tabs no-print">{divs.map(d=><button key={d} className={activeDiv===d?"on":""} onClick={()=>setDv(d)}>{d}</button>)}</div>
         {(()=>{const rounds=buildRounds(seedsFromSnap(st,activeDiv,byId),(st.knockWinners||{})[activeDiv]||{});return rounds.length?<Bracket rounds={rounds} winners={(st.knockWinners||{})[activeDiv]||{}} onPick={setKnock}/>:<p className="muted">[본선 대진 생성]을 눌러 대진을 만드세요.</p>;})()}
       </>}
