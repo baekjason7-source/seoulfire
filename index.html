@@ -121,6 +121,15 @@
   .pmx .ph small{display:block;font-weight:400;color:#64748b;font-size:10px}
   .pmx .rh{background:#f8fafc;font-weight:700;text-align:left;white-space:nowrap;padding-left:10px}
   .pmx .diag{background:#e2e8f0}
+  .pno{display:block;font-size:11px;font-weight:800;color:#d32f2f;margin-bottom:1px}
+  .pmx .rh .pno{display:inline-block;width:18px;margin:0 6px 0 0}
+  .sord{padding:6px 12px 10px;text-align:center}
+  .sord-t{font-size:12px;font-weight:700;margin-bottom:4px}
+  .ordt{border-collapse:collapse;margin:0 auto 4px;width:auto}
+  .ordt th,.ordt td{border:1px solid #64748b;text-align:center;font-size:12px;padding:3px 0;width:26px;height:22px}
+  .ordt th{width:30px;background:#f1f5f9;font-size:11px;line-height:1.3}
+  .ordt tr:first-child td{border-bottom:1px dashed #cbd5e1}
+  .ordt tr:last-child td{border-top:0}
   .pmx .sum{background:#fafafa;min-width:52px;font-weight:600}
   @media print{.no-print{display:none!important}.card{box-shadow:none;border:none;padding:0}.wrap{max-width:none}}
 </style>
@@ -149,7 +158,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-10b";
+const BUILD="2026-11-10c";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -423,12 +432,12 @@ function PrelimSheet({state,byId,evLabel}){
       <table className="pmx">
         <thead><tr>
           <th className="corner"></th>
-          {members.map(m=><th className="ph" key={m.id}>{m.name}<small>{m.div}{m.org?" · "+m.org:""}</small></th>)}
+          {members.map((m,i)=><th className="ph" key={m.id}><span className="pno">{i+1}</span>{m.name}<small>{m.div}{m.org?" · "+m.org:""}</small></th>)}
           <th className="sum">승점</th><th className="sum">득·실</th><th className="sum">순위</th>
         </tr></thead>
         <tbody>
-          {members.map(rp=>(<tr key={rp.id}>
-            <th className="rh">{rp.name}</th>
+          {members.map((rp,ri)=>(<tr key={rp.id}>
+            <th className="rh"><span className="pno">{ri+1}</span>{rp.name}</th>
             {members.map(cp=> rp.id===cp.id
               ? <td className="diag" key={cp.id}></td>
               : <td className="cellw" key={cp.id}></td>)}
@@ -436,9 +445,17 @@ function PrelimSheet({state,byId,evLabel}){
           </tr>))}
         </tbody>
       </table>
-      <div className="smatch"><b style={{fontSize:12}}>경기 순서</b>
-        {(()=>{const rows=matchOrder(members.map(m=>m.id),g.id).map(([a,b])=>[byId[a],byId[b]]);return rows.map((pr,k)=>(<div className="mrow" key={k}><span className="pn r">{k+1}. {pr[0].name}</span><span className="sets">{[1,2,3,4,5].map(s=><span className="sb" key={s}><i>{s}세트</i></span>)}</span><span className="pn">{pr[1].name}</span></div>));})()}
-      </div>
+      {(()=>{const ids=members.map(m=>m.id),no={};ids.forEach((id,i)=>no[id]=i+1);
+        const rows=matchOrder(ids,g.id).map(([a,b])=>[no[a],no[b]]);
+        // 한 줄 최대 21경기(7인 조 기준), 초과 시 균등 분할
+        const lines=Math.max(1,Math.ceil(rows.length/21)),per=Math.ceil(rows.length/lines),chunks=[];
+        for(let i=0;i<rows.length;i+=per)chunks.push(rows.slice(i,i+per));
+        return <div className="sord"><div className="sord-t">( 경기 순서 )</div>
+          {chunks.map((c,ci)=><table className="ordt" key={ci}><tbody>
+            <tr><th rowSpan={2}>순<br/>서</th>{c.map((p,k)=><td key={k}>{p[0]}</td>)}</tr>
+            <tr>{c.map((p,k)=><td key={k}>{p[1]}</td>)}</tr>
+          </tbody></table>)}
+        </div>;})()}
     </div>;
   })}</div>;
 }
