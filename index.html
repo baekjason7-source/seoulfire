@@ -164,6 +164,31 @@ function autoAllocGroups(list,tables){
   while(used<T){let best=null,bv=-1;list.forEach(x=>{if(out[x.t]>=cap(x))return;const v=x.n/out[x.t];if(v>bv){bv=v;best=x;}});if(!best)break;out[best.t]++;used++;}
   return out;
 }
+/* 소속 정규화 — 공백 제거, "○○소방서 △△센터"는 "○○"로 통일(같은 소방서 소속 판정). 복식은 두 선수 소속 모두 */
+function orgKey(o){o=((o||"")+"").replace(/\s+/g,"");if(!o||o==="-")return "";const i=o.indexOf("소방서");return i>0?o.slice(0,i):o;}
+function orgKeysOf(p){return [...new Set(((p.org||"")+"").split("/").map(orgKey).filter(Boolean))];}
+function orgConflicts(members){const c={};let n=0;members.forEach(p=>orgKeysOf(p).forEach(k=>{if(c[k])n++;c[k]=(c[k]||0)+1;}));return n;}
+/* 같은 소속 분리 배정 — 인원 고르게(조간 차이 최대 1명) 유지하면서 같은 소속이 한 조에 겹치지 않게 배치 */
+function spreadByOrg(list,ng){
+  const n=list.length,cap=[];for(let i=0;i<ng;i++)cap.push(Math.floor(n/ng)+(i<n%ng?1:0));
+  const freq={};list.forEach(p=>orgKeysOf(p).forEach(k=>freq[k]=(freq[k]||0)+1));
+  const w=p=>orgKeysOf(p).reduce((a,k)=>Math.max(a,freq[k]),0);
+  const order=list.map((p,i)=>({p,i,w:w(p)})).sort((a,b)=>b.w-a.w||a.i-b.i).map(x=>x.p); // 인원 많은 소속부터
+  const bk=[];for(let i=0;i<ng;i++)bk.push([]);
+  const clash=(b,p)=>{const ks=orgKeysOf(p);return b.reduce((a,q)=>a+orgKeysOf(q).filter(k=>ks.includes(k)).length,0);};
+  order.forEach(p=>{let best=-1,bv=null;
+    bk.forEach((b,k)=>{if(b.length>=cap[k])return;const v=[clash(b,p),b.length,Math.random()];
+      if(!bv||v[0]<bv[0]||(v[0]===bv[0]&&(v[1]<bv[1]||(v[1]===bv[1]&&v[2]<bv[2])))){bv=v;best=k;}});
+    bk[best].push(p);});
+  const total=()=>bk.reduce((a,b)=>a+orgConflicts(b),0);   // 남은 중복은 조간 맞교환으로 해소 시도
+  for(let pass=0;pass<50;pass++){let improved=false;const cur=total();if(!cur)break;
+    for(let x=0;x<ng&&!improved;x++){if(!orgConflicts(bk[x]))continue;
+      for(let i=0;i<bk[x].length&&!improved;i++)for(let y=0;y<ng&&!improved;y++){if(y===x)continue;
+        for(let j=0;j<bk[y].length;j++){[bk[x][i],bk[y][j]]=[bk[y][j],bk[x][i]];
+          if(total()<cur){improved=true;break;}[bk[x][i],bk[y][j]]=[bk[y][j],bk[x][i]];}}}
+    if(!improved)break;}
+  return bk;
+}
 function makeGroups(entries, size, tierMap, sepOrg, counts, tables){
   const byTier={}; entries.forEach(p=>{const t=tierOf(tierMap,p.div||"1부");(byTier[t]=byTier[t]||[]).push(p);});
   const gnum=s=>{const m=String(s).match(/\d+/);return m?+m[0]:99;};
@@ -174,13 +199,8 @@ function makeGroups(entries, size, tierMap, sepOrg, counts, tables){
     for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}
     const nn=list.length, sz=size||3;
     const ng=groupCountOf(counts,t,nn,sz);              // 부별로 지정한 조 수(미지정 시 조당 인원 기준) — 인원 고르게 배분, 1인 조 방지
-    if(sepOrg){                                         // 같은 소속은 서로 다른 조로 분산
-      const byOrg={};list.forEach(p=>{const o=((p.org||"-")+"").trim()||"-";(byOrg[o]=byOrg[o]||[]).push(p);});
-      const cl=Object.keys(byOrg).map(k=>byOrg[k]).sort((a,b)=>b.length-a.length);
-      list=[];cl.forEach(c=>c.forEach(p=>list.push(p)));
-    }
-    const buckets=[];for(let i=0;i<ng;i++)buckets.push([]);
-    list.forEach((p,i)=>{const rd=Math.floor(i/ng),k=(rd%2===0)?(i%ng):(ng-1-(i%ng));buckets[k].push(p);});
+    const buckets=sepOrg?spreadByOrg(list,ng):(()=>{const bk=[];for(let i=0;i<ng;i++)bk.push([]);
+      list.forEach((p,i)=>{const rd=Math.floor(i/ng),k=(rd%2===0)?(i%ng):(ng-1-(i%ng));bk[k].push(p);});return bk;})();
     buckets.forEach(b=>{if(!b.length)return;groups.push({id:`g_${t}_${idx}`,name:`${gname(idx)}조`,div:t,table:(idx%(tables||12))+1,members:b.map(p=>p.id)});idx++;});
   });
   return groups;
@@ -592,7 +612,7 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
     const tl=tierList(evEntries,st.tierMap||{}),tot=tl.reduce((a,x)=>a+groupCountOf(st.groupCounts,x.t,x.n,st.groupSize||3),0),T=st.tables||12;
     if(tot>T&&!confirm(`조 수 합계 ${tot}개가 탁구대 ${T}대를 초과합니다.\n${T+1}번째 조부터는 탁구대를 이어서 사용(${T}대 순환 배정)하게 됩니다. 계속할까요?`))return;
     if((st.groups||[]).length&&Object.keys(st.prelim||{}).length&&!confirm("이미 입력된 예선 결과가 모두 지워집니다. 다시 편성할까요?"))return;
-    const nd={...st,groups:makeGroups(evEntries,st.groupSize||3,st.tierMap||{},!!st.sepOrg,st.groupCounts||{},T),prelim:{},knockWinners:{},knockSeeds:{},advance:adv};
+    const nd={...st,groups:makeGroups(evEntries,st.groupSize||3,st.tierMap||{},st.sepOrg!==false,st.groupCounts||{},T),prelim:{},knockWinners:{},knockSeeds:{},advance:adv};
     patchLocal(nd);try{await saveState(ev,nd);if(old.length)await delRows(old);}catch(e){fail(e);}};
   const setScore=(gId,a,b,sa,sb,pa,pb)=>{const np={...(st.prelim||{})},key=pKey(gId,a,b);
     const na=(sa===""||sa==null)?0:parseInt(sa)||0,nb=(sb===""||sb==null)?0:parseInt(sb)||0;
@@ -665,7 +685,7 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
           <select value={st.bo||3} onChange={e=>patch({...st,bo:Number(e.target.value)})}>
             <option value={3}>3전2승</option><option value={5}>5전3승</option>
           </select></label>
-        <label style={{display:"flex",alignItems:"center",gap:4}}><input type="checkbox" style={{width:"auto"}} checked={!!st.sepOrg} onChange={e=>patch({...st,sepOrg:e.target.checked})}/> 같은 소속 분리</label>
+        <label style={{display:"flex",alignItems:"center",gap:4}}><input type="checkbox" style={{width:"auto"}} checked={st.sepOrg!==false} onChange={e=>patch({...st,sepOrg:e.target.checked})}/> 같은 소속 분리</label>
         <label>본선 진출&nbsp;
           <select value={adv} onChange={e=>patch({...st,advance:Number(e.target.value)})}>
             <option value={1}>조 1위</option><option value={2}>조 2명</option><option value={3}>조 3명</option><option value={4}>조 4명</option><option value={99}>전원 통과</option>
@@ -696,9 +716,16 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
         </div>;})()}
       </div>
       {(st.groups||[]).length===0?<div className="card"><p className="muted">먼저 조를 편성하세요.</p></div>:
+      <>{(()=>{const bad=st.groups.map(g=>{const ms=g.members.map(id=>byId[id]).filter(Boolean),c={};
+          ms.forEach(p=>orgKeysOf(p).forEach(k=>(c[k]=c[k]||[]).push(p.name)));
+          const d=Object.keys(c).filter(k=>c[k].length>1).map(k=>k+"("+c[k].join("·")+")");return d.length?{g,d}:null;}).filter(Boolean);
+        return <div className="card no-print" style={{padding:"10px 14px",borderLeft:"4px solid "+(bad.length?"#d32f2f":"#047857")}}>
+          {bad.length?<><b style={{color:"#d32f2f"}}>같은 소속 중복 {bad.length}개 조</b> <span className="muted" style={{fontSize:12}}>(해당 부 조 수보다 같은 소속 인원이 많으면 불가피 — [자동 조 편성] 재실행 또는 조 수 조정)</span>
+            <ul style={{margin:"6px 0 0",paddingLeft:18,fontSize:13}}>{bad.map(x=><li key={x.g.id}>{x.g.div} {x.g.name}: {x.d.join(", ")}</li>)}</ul></>
+          :<b style={{color:"#047857"}}>✓ 같은 소속 중복 없음</b>}</div>;})()}
       <div className="g2">{st.groups.map(g=><div className="card" key={g.id}><div className="scroll">
         <Matrix group={g} prelim={st.prelim||{}} byId={byId} adv={adv} onScore={setScore} bo={st.bo||3}/>
-      </div></div>)}</div>}
+      </div></div>)}</div></>}
     </>}
 
     {tab==="knock"&&<div className="card">
