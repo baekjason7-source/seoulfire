@@ -65,7 +65,7 @@
   .mx-h{background:#f1f5f9;font-weight:700;font-size:12px;min-width:64px}
   .mx-h span,.mx-rh span{display:block;font-weight:400;color:#94a3b8;font-size:10px}
   .mx-rh{background:#f8fafc;text-align:left;font-weight:700;white-space:nowrap}
-  .mx .mx-ro{display:block;font-weight:500;color:#334155;font-size:10px;line-height:1.35;white-space:normal;word-break:keep-all;margin-top:2px;max-width:110px}
+  .mx .mx-ro{display:block;font-weight:500;color:#334155;font-size:10px;line-height:1.35;white-space:nowrap;margin-top:2px}
   .mx-diag{background:#e2e8f0}
   .mx-c{cursor:pointer;color:#cbd5e1;font-weight:700}
   .mx-c.ro{cursor:default}
@@ -120,11 +120,9 @@
   .pmx .corner{background:#f1f5f9;font-size:14px;font-weight:800}
   .pmx .ph{background:#f1f5f9;font-weight:700}
   .pmx .ph small{display:block;font-weight:400;color:#64748b;font-size:10px}
-  .pmx .pro{display:block;font-weight:500;color:#334155;font-size:10px;line-height:1.3;white-space:normal;word-break:keep-all;max-width:120px}
+  .pmx .pro{display:block;font-weight:500;color:#334155;font-size:10px;line-height:1.3;white-space:nowrap}
   .pmx .rh{background:#f8fafc;font-weight:700;text-align:left;white-space:nowrap;padding-left:10px}
-  .pmx .diag{padding:0;position:relative}
-  .pmx .diag .dg{position:absolute;top:0;left:0;right:0;bottom:0}
-  .pmx .diag svg{width:100%;height:100%;display:block}
+  .pmx .diag{padding:0;background:linear-gradient(to top right,transparent calc(50% - 0.6px),#334155 calc(50% - 0.6px),#334155 calc(50% + 0.6px),transparent calc(50% + 0.6px));-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .pmx .rno{width:26px;min-width:26px;padding:0;font-weight:800;color:#d32f2f;background:#f8fafc}
   .pno{display:block;font-size:11px;font-weight:800;color:#d32f2f;margin-bottom:1px}
   .pmx .rh .pno{display:inline-block;width:18px;margin:0 6px 0 0}
@@ -457,7 +455,7 @@ function PrelimSheet({state,byId,evLabel}){
             <td className="rno">{ri+1}</td>
             <th className="rh">{rp.name}</th>
             {members.map(cp=> rp.id===cp.id
-              ? <td className="diag" key={cp.id}><div className="dg"><svg viewBox="0 0 10 10" preserveAspectRatio="none"><line x1="0" y1="0" x2="10" y2="10" stroke="#334155" strokeWidth="1" vectorEffect="non-scaling-stroke"/></svg></div></td>
+              ? <td className="diag" key={cp.id}></td>
               : <td className="cellw" key={cp.id}></td>)}
             <td className="sum"></td><td className="sum"></td>
           </tr>))}
