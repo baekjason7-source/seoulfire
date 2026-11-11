@@ -122,8 +122,8 @@
   .pmx .ph small{display:block;font-weight:400;color:#64748b;font-size:10px}
   .pmx .pro{display:block;font-weight:500;color:#334155;font-size:10px;line-height:1.3;white-space:normal;word-break:keep-all;max-width:120px}
   .pmx .rh{background:#f8fafc;font-weight:700;text-align:left;white-space:nowrap;padding-left:10px}
-  .pmx .diag{padding:0}
-  .pmx .diag .dg{height:42px;width:100%}
+  .pmx .diag{padding:0;position:relative}
+  .pmx .diag .dg{position:absolute;top:0;left:0;right:0;bottom:0}
   .pmx .diag svg{width:100%;height:100%;display:block}
   .pmx .rno{width:26px;min-width:26px;padding:0;font-weight:800;color:#d32f2f;background:#f8fafc}
   .pno{display:block;font-size:11px;font-weight:800;color:#d32f2f;margin-bottom:1px}
@@ -389,7 +389,7 @@ function Matrix({group,prelim,byId,adv,onScore,bo,readOnly}){
       <tbody>
         {members.map(rp=>{const r=rec(rp.id),rk=rankOf(rp.id),a=rk<=adv;
           return <tr key={rp.id}>
-            <th className="mx-rh">{rp.name}{rosterOf(rp)?<RosterLine m={rp}/>:<span>{rp.org||""}</span>}</th>
+            <th className="mx-rh">{rp.name}{rp.org&&rp.org!==rp.name?<span>{rp.org}</span>:null}</th>
             {members.map(cp=>{if(rp.id===cp.id)return <td className="mx-diag" key={cp.id}></td>;
               const m=matchRes(prelim,group.id,rp.id,cp.id);
               return <td key={cp.id} className={"mx-c ro "+(m&&m.win===rp.id?"mx-w":m?"mx-l":"")}>{m?m.sx:""}</td>;})}
@@ -455,7 +455,7 @@ function PrelimSheet({state,byId,evLabel}){
         <tbody>
           {members.map((rp,ri)=>(<tr key={rp.id}>
             <td className="rno">{ri+1}</td>
-            <th className="rh">{rp.name}<RosterLine m={rp} cls="pro"/></th>
+            <th className="rh">{rp.name}</th>
             {members.map(cp=> rp.id===cp.id
               ? <td className="diag" key={cp.id}><div className="dg"><svg viewBox="0 0 10 10" preserveAspectRatio="none"><line x1="0" y1="0" x2="10" y2="10" stroke="#334155" strokeWidth="1" vectorEffect="non-scaling-stroke"/></svg></div></td>
               : <td className="cellw" key={cp.id}></td>)}
