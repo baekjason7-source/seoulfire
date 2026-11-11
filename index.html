@@ -65,6 +65,7 @@
   .mx-h{background:#f1f5f9;font-weight:700;font-size:12px;min-width:64px}
   .mx-h span,.mx-rh span{display:block;font-weight:400;color:#94a3b8;font-size:10px}
   .mx-rh{background:#f8fafc;text-align:left;font-weight:700;white-space:nowrap}
+  .mx .mx-ro{display:block;font-weight:500;color:#334155;font-size:10px;line-height:1.35;white-space:normal;word-break:keep-all;margin-top:2px;max-width:110px}
   .mx-diag{background:#e2e8f0}
   .mx-c{cursor:pointer;color:#cbd5e1;font-weight:700}
   .mx-c.ro{cursor:default}
@@ -119,6 +120,7 @@
   .pmx .corner{background:#f1f5f9;font-size:14px;font-weight:800}
   .pmx .ph{background:#f1f5f9;font-weight:700}
   .pmx .ph small{display:block;font-weight:400;color:#64748b;font-size:10px}
+  .pmx .pro{display:block;font-weight:500;color:#334155;font-size:10px;line-height:1.3;white-space:normal;word-break:keep-all;max-width:120px}
   .pmx .rh{background:#f8fafc;font-weight:700;text-align:left;white-space:nowrap;padding-left:10px}
   .pmx .diag{padding:0}
   .pmx .diag .dg{height:42px;width:100%}
@@ -366,6 +368,10 @@ const addEntry   =async row=>chk(await sb.from('entries').insert(row));
 const updateEntry=async(id,patch)=>chk(await sb.from('entries').update(patch).eq('id',id));
 const deleteEntry=async id=>chk(await sb.from('entries').delete().eq('id',id));
 
+/* 단체전: 팀명 아래 선수 명단 표시 */
+const rosterOf=m=>m&&m.event==="team"&&m.meta&&Array.isArray(m.meta.roster)&&m.meta.roster.length?m.meta.roster.map(x=>x.name).filter(Boolean):null;
+const RosterLine=({m,cls})=>{const r=rosterOf(m);return r?<span className={cls||"mx-ro"}>{r.join(" · ")}</span>:null;};
+
 /* ---------- 예선 교차표 ---------- */
 function Matrix({group,prelim,byId,adv,onScore,bo,readOnly}){
   const members=group.members.map(id=>byId[id]).filter(Boolean);
@@ -377,13 +383,13 @@ function Matrix({group,prelim,byId,adv,onScore,bo,readOnly}){
     <table className="mx">
       <thead><tr>
         <th className="corner">{group.name}<br/>{group.div}{group.table?<><br/><span style={{fontSize:11,color:"#d32f2f"}}>{group.table}번 탁구대</span></>:null}</th>
-        {members.map(m=><th className="mx-h" key={m.id}>{m.name}<span>{m.div}{m.org?" · "+m.org:""}</span></th>)}
+        {members.map(m=><th className="mx-h" key={m.id}>{m.name}<span>{m.div}{m.org&&m.org!==m.name?" · "+m.org:""}</span><RosterLine m={m}/></th>)}
         <th>승-패</th><th>세트</th><th>순위</th>
       </tr></thead>
       <tbody>
         {members.map(rp=>{const r=rec(rp.id),rk=rankOf(rp.id),a=rk<=adv;
           return <tr key={rp.id}>
-            <th className="mx-rh">{rp.name}<span>{rp.org||""}</span></th>
+            <th className="mx-rh">{rp.name}{rosterOf(rp)?<RosterLine m={rp}/>:<span>{rp.org||""}</span>}</th>
             {members.map(cp=>{if(rp.id===cp.id)return <td className="mx-diag" key={cp.id}></td>;
               const m=matchRes(prelim,group.id,rp.id,cp.id);
               return <td key={cp.id} className={"mx-c ro "+(m&&m.win===rp.id?"mx-w":m?"mx-l":"")}>{m?m.sx:""}</td>;})}
@@ -443,13 +449,13 @@ function PrelimSheet({state,byId,evLabel}){
       <table className="pmx">
         <thead><tr>
           <th className="corner" colSpan={2}>{g.name}</th>
-          {members.map((m,i)=><th className="ph" key={m.id}><span className="pno">{i+1}</span>{m.name}<small>{m.div}{m.org?" · "+m.org:""}</small></th>)}
+          {members.map((m,i)=><th className="ph" key={m.id}><span className="pno">{i+1}</span>{m.name}<small>{m.div}{m.org&&m.org!==m.name?" · "+m.org:""}</small><RosterLine m={m} cls="pro"/></th>)}
           <th className="sum">승/패</th><th className="sum">순위</th>
         </tr></thead>
         <tbody>
           {members.map((rp,ri)=>(<tr key={rp.id}>
             <td className="rno">{ri+1}</td>
-            <th className="rh">{rp.name}</th>
+            <th className="rh">{rp.name}<RosterLine m={rp} cls="pro"/></th>
             {members.map(cp=> rp.id===cp.id
               ? <td className="diag" key={cp.id}><div className="dg"><svg viewBox="0 0 10 10" preserveAspectRatio="none"><line x1="0" y1="0" x2="10" y2="10" stroke="#334155" strokeWidth="1" vectorEffect="non-scaling-stroke"/></svg></div></td>
               : <td className="cellw" key={cp.id}></td>)}
