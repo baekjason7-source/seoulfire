@@ -193,7 +193,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-10f";
+const BUILD="2026-11-13a";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -557,7 +557,8 @@ function Register({entries,reload,meta}){
   const hitPhone=e=>{const q=qp.trim();if(!q)return true;const m=e.meta||{};
     return (e.phone||"").includes(q)||(m.p1&&(m.p1.phone||"").includes(q))||(m.p2&&(m.p2.phone||"").includes(q));};
   const mine=(qn.trim()||qp.trim())?entries.filter(e=>(qn.trim()?e.name.includes(qn.trim()):true)&&hitPhone(e)):[];
-  const cancel=async(id)=>{if(!confirm("이 신청을 취소할까요?"))return;await deleteEntry(id);await reload();};
+  const cancel=async(id)=>{if(meta&&meta.closed){alert("접수가 마감되어 온라인 취소가 불가합니다.\n취소·변경은 운영진에게 문의하세요.");return;}
+    if(!confirm("이 신청을 취소할까요?"))return;await deleteEntry(id);await reload();};
   const Dsel=({v,on})=><select value={v} onChange={e=>on(e.target.value)}>{DIVS.map(d=><option key={d}>{d}</option>)}</select>;
   const hap=num(p1.div)+num(p2.div);
   return (<>
@@ -609,7 +610,7 @@ function Register({entries,reload,meta}){
       <div className="row"><input placeholder="이름/팀명" value={qn} onChange={e=>setQn(e.target.value)} style={{flex:1}}/><input placeholder="연락처" value={qp} onChange={e=>setQp(e.target.value)} style={{flex:1}}/></div>
       {(qn.trim()||qp.trim())&&(mine.length?
         <table style={{marginTop:12}}><thead><tr><th>종목</th><th>이름</th><th>부수</th><th></th></tr></thead>
-        <tbody>{mine.map(e=><tr key={e.id}><td>{EVLABEL[e.event]}</td><td>{e.name}</td><td><span className="pill">{e.div}</span></td><td><button className="btn btn-sm btn-d" onClick={()=>cancel(e.id)}>취소</button></td></tr>)}</tbody></table>
+        <tbody>{mine.map(e=><tr key={e.id}><td>{EVLABEL[e.event]}</td><td>{e.name}</td><td><span className="pill">{e.div}</span></td><td>{meta&&meta.closed?<span className="muted" style={{fontSize:12}}>운영진 문의</span>:<button className="btn btn-sm btn-d" onClick={()=>cancel(e.id)}>취소</button>}</td></tr>)}</tbody></table>
         :<p className="muted" style={{marginTop:12}}>해당하는 신청이 없습니다.</p>)}
     </div>
     </>);
@@ -660,6 +661,7 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
   const [tab,setTab]=useState("list");
   const [dv,setDv]=useState("");
   const [pmode,setPmode]=useState("prelim");
+  const [edit,setEdit]=useState(null);
   const st=states[ev]||{advance:2}, byId={}; entries.forEach(e=>byId[e.id]=e);
   const evEntries=entries.filter(e=>e.event===ev);
   const adv=st.advance||2;
@@ -707,7 +709,40 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
     patchLocal(nd);try{await saveState(ev,nd);if(old.length)await delRows(old);}catch(e){fail(e);}};
   const togglePub=()=>patch({...st,published:!st.published});
   const togglePaid=async(e)=>{try{await updateEntry(e.id,{paid:!e.paid});await reload(true);}catch(er){fail(er);}};
-  const del=async(id)=>{if(!confirm("이 참가자를 삭제할까요?"))return;try{await deleteEntry(id);await reload(true);}catch(e){fail(e);}};
+  /* 참가자 삭제 — 대진표 데이터(tstate)는 건드리지 않음. 확정 본선 대진에 실명이 들어간 선수는 삭제 차단 */
+  const delInfo=id=>{const ks=st.knockSeeds||{},inKnock=Object.keys(ks).filter(d=>(ks[d]||[]).includes(id));
+    const g=(st.groups||[]).find(x=>(x.members||[]).includes(id));let played=0;
+    if(g)(g.members||[]).forEach(o=>{if(o!==id&&byId[o]&&matchRes(st.prelim||{},g.id,id,o))played++;});
+    const live=g?liveGroup(g,byId).members.length:0;return {inKnock,g,played,short:!!g&&live-1<adv};};
+  const del=async(id)=>{const p=byId[id]||{},i=delInfo(id),forfeit=(st.bo||3)===5?"3:0":"2:0";
+    if(i.inKnock.length)return alert(`${p.name}은(는) 확정된 본선 대진표(${i.inKnock.join(", ")})에 이름이 들어가 있어 삭제할 수 없습니다.\n삭제하면 뒤 선수들이 한 칸씩 당겨져 대진표 전체가 바뀝니다.\n\n불참·기권은 [본선] 탭에서 상대 선수를 승자로 선택해 처리하세요.`);
+    const w=[];
+    if(i.g)w.push(`· ${i.g.div} ${i.g.name}에서 빠지며, 이 조의 경기 순서 번호가 다시 정해집니다(이 조 오더지 재출력 필요).`);
+    if(i.played)w.push(`· 이미 입력된 예선 결과가 ${i.played}경기 있습니다. 당일 불참·기권이면 삭제 대신 상대에게 ${forfeit}를 입력하는 것을 권장합니다.`);
+    if(i.short)w.push(`· 삭제 후 이 조 인원이 본선 진출 인원(${adv}명)보다 적어 본선 자리 수가 줄어듭니다.`);
+    if(!confirm(`${p.name} 님을 삭제할까요?`+(w.length?"\n\n"+w.join("\n"):"")))return;
+    try{await deleteEntry(id);await reload(true);}catch(e){fail(e);}};
+  /* 운영진 직접 추가·수정 (접수 마감과 무관) */
+  const blankForm=k=>({id:null,event:k,name:"",org:"",div:"1부",phone:"",p1:{name:"",org:"",div:"1부",phone:""},p2:{name:"",org:"",div:"1부",phone:""},roster:[0,1,2,3].map(()=>({name:"",div:"1부"}))});
+  const formOf=e=>{const m=e.meta||{},f=blankForm(e.event);Object.assign(f,{id:e.id,name:e.name||"",org:e.org||"",div:e.div||"1부",phone:e.phone||""});
+    if(m.p1)f.p1={...f.p1,...m.p1};if(m.p2)f.p2={...f.p2,...m.p2};
+    if(Array.isArray(m.roster)){const r=m.roster.map(x=>({name:x.name||"",div:x.div||"1부"}));while(r.length<4)r.push({name:"",div:"1부"});f.roster=r;}
+    return f;};
+  const sf=(k,v)=>setEdit(f=>({...f,[k]:v})),sp=(pp,k,v)=>setEdit(f=>({...f,[pp]:{...f[pp],[k]:v}})),
+    sr=(i,k,v)=>setEdit(f=>({...f,roster:f.roster.map((x,j)=>j===i?{...x,[k]:v}:x)}));
+  const dsel=(v,on)=><select value={v} onChange={e=>on(e.target.value)}>{DIVS.map(d=><option key={d}>{d}</option>)}</select>;
+  const rowOf=f=>{const t=x=>(x||"").trim();
+    if(f.event==="single"){if(!t(f.name))return["이름을 입력하세요."];return[null,{name:t(f.name),org:t(f.org),div:f.div,phone:t(f.phone),meta:{}}];}
+    if(f.event==="double"){if(!t(f.p1.name)||!t(f.p2.name))return["두 선수 이름을 입력하세요."];const hap=(parseInt(f.p1.div)||0)+(parseInt(f.p2.div)||0);
+      const P=q=>({name:t(q.name),org:t(q.org),div:q.div,phone:t(q.phone)});
+      return[null,{name:t(f.p1.name)+"·"+t(f.p2.name),org:t(f.p1.org)+"/"+t(f.p2.org),div:"합"+hap+"부",phone:t(f.p1.phone)||t(f.p2.phone),meta:{p1:P(f.p1),p2:P(f.p2),hap:hap}}];}
+    if(!t(f.name))return["팀명을 입력하세요."];const roster=f.roster.filter(x=>t(x.name)).map(x=>({name:t(x.name),div:x.div}));
+    if(!roster.length)return["선수 명단을 입력하세요."];return[null,{name:t(f.name),org:t(f.name),div:f.div,phone:t(f.phone),meta:{roster:roster}}];};
+  const saveForm=async()=>{const f=edit,[err,row]=rowOf(f);if(err)return alert(err);
+    try{if(f.id){const old=byId[f.id]||{};await updateEntry(f.id,{...row,meta:{...(old.meta||{}),...row.meta}});}
+      else{await addEntry({...row,event:f.event});
+        if((st.groups||[]).length)alert("추가되었습니다.\n[조편성·예선] 탭 상단 「조 미배정 참가자」에서 들어갈 조를 골라 [조에 추가]하세요.\n(다른 조·본선 대진표는 바뀌지 않습니다)");}
+      setEdit(null);await reload(true);}catch(e){fail(e);}};
   const ADMTABS=[["list","신청현황"],["group","조편성·예선"],["knock","본선"],["print","출력"],["set","대회설정"]];
   return (<>
     <div className="segs no-print">{EVACT(meta).map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>{setEv(k);setDv("");}}>{t}</button>)}</div>
@@ -715,7 +750,36 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
       <button className="btn btn-sm" style={{marginLeft:"auto"}} onClick={reload}>🔄 새로고침</button></div>
 
     {tab==="list"&&<div className="card">
-      <h2>{EVLABEL[ev]} 신청현황 ({evEntries.length})</h2>
+      <div className="row no-print" style={{alignItems:"center",gap:8}}><h2 style={{margin:0}}>{EVLABEL[ev]} 신청현황 ({evEntries.length})</h2>
+        <button className="btn btn-p btn-sm" style={{marginLeft:"auto"}} onClick={()=>setEdit(blankForm(ev))}>+ 참가자 직접 추가</button></div>
+      {edit&&<div className="card no-print" style={{borderLeft:"4px solid #1F4E79",marginTop:10}}>
+        <h3 style={{marginTop:0}}>{edit.id?"신청 정보 수정":"참가자 직접 추가"} — {EVLABEL[edit.event]}</h3>
+        {edit.event==="single"&&<div className="grid">
+          <input placeholder="이름" value={edit.name} onChange={e=>sf("name",e.target.value)}/>
+          <input placeholder="소속" value={edit.org} onChange={e=>sf("org",e.target.value)}/>
+          {dsel(edit.div,v=>sf("div",v))}
+          <input placeholder="연락처" value={edit.phone} onChange={e=>sf("phone",e.target.value)}/></div>}
+        {edit.event==="double"&&[["p1","선수1"],["p2","선수2"]].map(([k,t])=><div key={k} className="grid" style={{marginBottom:6}}>
+          <input placeholder={t+" 이름"} value={edit[k].name} onChange={e=>sp(k,"name",e.target.value)}/>
+          <input placeholder="소속" value={edit[k].org} onChange={e=>sp(k,"org",e.target.value)}/>
+          {dsel(edit[k].div,v=>sp(k,"div",v))}
+          <input placeholder="연락처" value={edit[k].phone} onChange={e=>sp(k,"phone",e.target.value)}/></div>)}
+        {edit.event==="team"&&<>
+          <div className="grid"><input placeholder="팀명(기관명)" value={edit.name} onChange={e=>sf("name",e.target.value)}/>
+            {dsel(edit.div,v=>sf("div",v))}
+            <input placeholder="대표 연락처" value={edit.phone} onChange={e=>sf("phone",e.target.value)}/></div>
+          <div style={{fontSize:13,fontWeight:600,margin:"8px 0 4px"}}>선수 명단</div>
+          {edit.roster.map((x,i)=><div key={i} className="row" style={{gap:6,marginBottom:4}}>
+            <span className="muted" style={{width:22}}>{i+1}</span>
+            <input placeholder={"선수"+(i+1)+" 이름"} value={x.name} onChange={e=>sr(i,"name",e.target.value)} style={{flex:1}}/>
+            {dsel(x.div,v=>sr(i,"div",v))}</div>)}
+          <button className="btn btn-sm" onClick={()=>setEdit(f=>({...f,roster:[...f.roster,{name:"",div:"1부"}]}))}>+ 선수 칸 추가</button>
+          <span className="muted" style={{fontSize:12,marginLeft:6}}>(이름을 비우면 명단에서 빠집니다)</span></>}
+        <div className="row" style={{gap:8,marginTop:10}}>
+          <button className="btn btn-p" onClick={saveForm}>저장</button>
+          <button className="btn" onClick={()=>setEdit(null)}>닫기</button></div>
+        <p className="muted" style={{fontSize:12,marginBottom:0}}>{edit.id?"※ 이름·소속·명단만 바뀌며 조 배정·예선 결과·본선 대진표는 그대로 유지됩니다(부수를 바꿔도 조는 이동하지 않습니다).":"※ 접수 마감 중에도 추가됩니다. 조 편성 후라면 [조편성·예선] 탭 「조 미배정 참가자」에서 조에 넣어 주세요."}</p>
+      </div>}
       {evEntries.length===0?<p className="muted">신청자가 없습니다.</p>:
       <table><thead><tr><th>#</th><th>이름</th><th>소속</th><th>부수</th><th>연락처</th><th>입금</th><th></th></tr></thead>
       <tbody>{evEntries.map((e,i)=><tr key={e.id}>
@@ -727,7 +791,7 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
         <td>{e.event==="team"?"-":e.org||"-"}</td>
         <td><span className="pill">{e.div}</span></td><td className="muted">{e.phone||"-"}</td>
         <td><button className={"btn btn-sm "+(e.paid?"btn-p":"")} onClick={()=>togglePaid(e)}>{e.paid?"완료":"미납"}</button></td>
-        <td><button className="btn btn-sm btn-d" onClick={()=>del(e.id)}>삭제</button></td>
+        <td style={{whiteSpace:"nowrap"}}><button className="btn btn-sm" onClick={()=>setEdit(formOf(e))}>수정</button> <button className="btn btn-sm btn-d" onClick={()=>del(e.id)}>삭제</button></td>
       </tr>)}</tbody></table>}
     </div>}
 
