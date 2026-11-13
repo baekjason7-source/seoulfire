@@ -100,6 +100,7 @@
   .sheet-g{font-size:24px;font-weight:800;padding:10px 18px;border-right:1px solid #94a3b8;display:flex;align-items:center;color:#d32f2f}
   .sheet-t{flex:1;padding:8px 12px;font-weight:700}
   .sheet-t small{display:block;font-weight:400;font-size:11px;color:#b91c1c;margin-top:2px}
+  .sheet-t small.hcap{color:#1F4E79;font-weight:700}
   .sheet-tb{width:78px;border-left:1px solid #94a3b8;text-align:center;padding:8px;font-size:12px;color:#475569}
   .srank{width:100%;border-collapse:collapse}
   .srank td{border:1px solid #94a3b8;text-align:center;padding:6px;font-size:13px}
@@ -475,7 +476,7 @@ function PrelimSheet({state,byId,evLabel,title}){
       <div className="sheet">
       <div className="sheet-h">
         <div className="sheet-g">{g.name}</div>
-        <div className="sheet-t">{evLabel} · {g.div}<small>각 칸에 이긴 게임(세트) 수 기록 · 부수 차이만큼 약자가 핸디(선취점) 적용 · 동점 시 득·실로 순위 판정</small></div>
+        <div className="sheet-t">{evLabel} · {g.div}<small>각 칸에 이긴 게임(세트) 수 기록 · 부수 차이만큼 약자가 핸디(선취점) 적용 · 동점 시 득·실로 순위 판정</small>{evLabel==="단체전"&&<small className="hcap">(복식) 부수합 차이에 -1 (최대 핸디 3개) · 부수차이 : 1 → 핸디없음, 2 → 1점, 3~4 → 2점, 5~7 → 3점</small>}</div>
         <div className="sheet-tb">탁구대<br/>{g.table?<b style={{fontSize:20,color:"#111"}}>{g.table}</b>:"______"}</div>
       </div>
       <div className="pmx-wrap"><table className="pmx">
