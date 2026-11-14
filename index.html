@@ -141,6 +141,17 @@
   .otitle{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 8px;font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-.3px}
   .otitle img{height:40px;width:auto}
   .pmx-wrap{display:flex}
+  .kst{border-collapse:collapse;width:100%;margin:0}
+  .kst th,.kst td{border:1px solid #64748b;text-align:center;font-size:13px;padding:6px 4px}
+  .kst th{background:#f1f5f9;font-size:12px}
+  .kst .kn{text-align:left;min-width:120px}
+  .kst .kn small{display:block;color:#64748b;font-size:11px;font-weight:400}
+  .kst td.sc{width:11%;height:46px;color:#cbd5e1}
+  .ksf{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:10px 12px;font-size:13px;border-top:1px solid #94a3b8}
+  .kstm{display:flex;border-bottom:1px solid #94a3b8}
+  .kstm>div{flex:1;padding:6px 10px;font-size:12px}
+  .kstm>div+div{border-left:1px solid #94a3b8}
+  .kstm b{font-size:14px}
   @media print{.no-print{display:none!important}.card{box-shadow:none;border:none;padding:0}.wrap{max-width:none}
     body:has(.pp){background:#fff}
     body:has(.pp) .top{display:none!important}
@@ -164,6 +175,8 @@
     .pp .pmx .sum{width:13mm}
     .pp .pmx .rh{padding-left:6px}
     .pp .sord{padding:3mm 4mm}
+    .pp .ks .kst{flex:1}
+    .pp .ks .kst td.sc{height:auto}
     body:not(:has(.pp)) .wrap{padding:10mm}
   }
   @page{size:A4 portrait;margin:0}
@@ -193,7 +206,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-13a";
+const BUILD="2026-11-14a";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -314,11 +327,11 @@ function standings(g,prelim){
 }
 const nextPow2=n=>{let p=1;while(p<n)p*=2;return Math.max(p,1);};
 function seedPositions(n){let pols=[1,2];while(pols.length<n){const s=pols.length*2+1;const o=[];for(const p of pols){o.push(p);o.push(s-p);}pols=o;}return pols;}
-function matchWinner(m,w){if(m.a&&!m.b)return m.a;if(m.b&&!m.a)return m.b;if(!m.a||!m.b)return null;const id=w[m.id];if(m.a&&id===m.a.id)return m.a;if(m.b&&id===m.b.id)return m.b;return null;}
+function matchWinner(m,w){if(m.bye)return m.a||m.b||null;if(!m.a||!m.b)return null;const id=w[m.id];if(m.a&&id===m.a.id)return m.a;if(m.b&&id===m.b.id)return m.b;return null;}
 function buildRounds(seeds,winners){
   if(seeds.length<2)return[];
   const size=nextPow2(seeds.length),pos=seedPositions(size),slots=pos.map(p=>seeds[p-1]||null);
-  const rounds=[];let r0=[];for(let i=0;i<size;i+=2)r0.push({id:`r0m${i/2}`,a:slots[i],b:slots[i+1]});rounds.push(r0);
+  const rounds=[];let r0=[];for(let i=0;i<size;i+=2)r0.push({id:`r0m${i/2}`,a:slots[i],b:slots[i+1],bye:!(slots[i]&&slots[i+1])});rounds.push(r0);
   let r=0;
   while(rounds[r].length>1){const prev=rounds[r],nx=[];for(let i=0;i<prev.length;i+=2)nx.push({id:`r${r+1}m${i/2}`,a:matchWinner(prev[i],winners),b:matchWinner(prev[i+1],winners)});rounds.push(nx);r++;}
   return rounds;
@@ -458,7 +471,7 @@ function Bracket({rounds,winners,onPick,readOnly}){
       <div className="brk-col" key={ri}><p>{roundName(ri,t)}</p>
         {round.map(m=>{const w=matchWinner(m,winners);
           const Side=({pl})=>(<button disabled={readOnly||!pl||pl.ph} className={w&&pl&&w.id===pl.id?"w":""}
-            onClick={()=>pl&&!pl.ph&&onPick&&onPick(m.id,pl.id)}>{pl?(pl.ph?<span style={{color:"#64748b"}}>{pl.name}</span>:pl.name):<span className="muted">부전승</span>}</button>);
+            onClick={()=>pl&&!pl.ph&&onPick&&onPick(m.id,pl.id)}>{pl?(pl.ph?<span style={{color:"#64748b"}}>{pl.name}</span>:pl.name):<span className="muted">{m.bye?"부전승":"미정"}</span>}</button>);
           return <div className="brk-m" key={m.id}><Side pl={m.a}/><Side pl={m.b}/></div>;})}
       </div>))}
     {champ&&<div style={{display:"flex",flexDirection:"column",justifyContent:"center"}}><p style={{fontSize:12,color:"#94a3b8",textAlign:"center"}}>우승</p><div className="champ">🏆 {champ.name}</div></div>}
@@ -510,6 +523,62 @@ function PrelimSheet({state,byId,evLabel,title}){
       </div>
     </div>;
   })}</div>;
+}
+
+/* ---------- 본선 경기 기록지(출력) — 대진표 데이터는 읽기만 함(저장·변경 없음) ---------- */
+function knockMatches(st,byId,divs){const out=[];
+  divs.forEach(d=>{const w=(st.knockWinners||{})[d]||{},rounds=buildRounds(seedsFromSnap(st,d,byId),w),lab={};
+    rounds.forEach((round,ri)=>{let k=0;round.forEach((m,mi)=>{
+      if(ri===0&&(!m.a||!m.b))return; // 부전승은 경기 없음
+      const pa=ri>0?rounds[ri-1][mi*2]:null,pb=ri>0?rounds[ri-1][mi*2+1]:null;
+      k++;const rn=roundName(ri,rounds.length),nm=round.length>1?`${rn} ${k}경기`:rn;lab[m.id]=nm;
+      const side=(p,prev)=>p?p:{id:"tbd",name:prev&&lab[prev.id]?`${lab[prev.id]} 승자`:"미정",ph:true};
+      out.push({key:d+"|"+m.id,div:d,round:rn,name:nm,a:side(m.a,pa),b:side(m.b,pb),done:!!(m.a&&m.b&&matchWinner(m,w))});
+    });});});
+  return out;}
+function KnockSheet({state,byId,evLabel,title,divs}){
+  const [fd,setFd]=useState(""),[fr,setFr]=useState(""),[mode,setMode]=useState("wait"),[only,setOnly]=useState(null);
+  useEffect(()=>{const f=()=>setOnly(null);window.addEventListener("afterprint",f);return()=>window.removeEventListener("afterprint",f);},[]);
+  const all=knockMatches(state,byId,divs);
+  if(!all.length)return <p className="muted" style={{textAlign:"center"}}>[본선 대진 생성] 후 출력할 수 있습니다.</p>;
+  const ready=m=>!m.a.ph&&!m.b.ph,isTeam=evLabel==="단체전",rnames=[...new Set(all.map(m=>m.round))];
+  const list=only?all.filter(m=>m.key===only):all.filter(m=>(!fd||m.div===fd)&&(!fr||m.round===fr)&&(mode==="all"||(ready(m)&&(mode==="ready"||!m.done))));
+  const dn=p=>parseInt(p&&p.div)||0;
+  const hcap=m=>{if(isTeam||!ready(m))return null;const x=dn(m.a),y=dn(m.b);if(!x||!y||x===y)return null;const wk=x>y?m.a:m.b;return `핸디: ${wk.name} ${Math.abs(x-y)}점 선취 (${m.a.div} vs ${m.b.div})`;};
+  const Who=({p})=><><b>{p.name}</b>{!p.ph&&<small>{p.org&&p.org!==p.name?p.org+" · ":""}{p.div}</small>}</>;
+  const SC=()=>[1,2,3,4,5].map(n=><td className="sc" key={n}>:</td>);
+  return <>
+    <div className="row no-print" style={{gap:8,marginBottom:10}}>
+      {only?<><b>선택한 1경기만 표시 중</b><button className="btn btn-sm" onClick={()=>setOnly(null)}>전체 목록으로</button></>:<>
+      <select value={fd} onChange={e=>setFd(e.target.value)} style={{width:"auto"}}><option value="">전체 부</option>{divs.map(d=><option key={d}>{d}</option>)}</select>
+      <select value={fr} onChange={e=>setFr(e.target.value)} style={{width:"auto"}}><option value="">전체 라운드</option>{rnames.map(r=><option key={r}>{r}</option>)}</select>
+      <select value={mode} onChange={e=>setMode(e.target.value)} style={{width:"auto"}}>
+        <option value="wait">진행 대기 경기(두 선수 확정·결과 미입력)</option><option value="ready">두 선수 확정된 경기 전체</option><option value="all">전체(미정 자리 포함)</option></select>
+      <span className="muted" style={{fontSize:12}}>{list.length}경기 · A4 1장에 2경기</span></>}
+    </div>
+    {list.length===0&&<p className="muted no-print">조건에 맞는 경기가 없습니다. 예선이 끝나지 않아 「A조 1위」처럼 표시된 경기는 [전체]에서 볼 수 있습니다.</p>}
+    <div>{list.map(m=><div className="half ks" key={m.key}>
+      <div className="otitle"><img src={LOGO} alt=""/><span>{title} {evLabel} 본선 경기 기록지</span></div>
+      <div className="sheet">
+        <div className="sheet-h">
+          <div className="sheet-g" style={{fontSize:18}}>{m.round}</div>
+          <div className="sheet-t">{evLabel} · {m.div} · {m.name}<small>본선 5전3선승 · 각 칸에 세트 점수(예: 11:7) 기록 · 부수 차이만큼 약자가 핸디(선취점) 적용</small>
+            {hcap(m)&&<small className="hcap">{hcap(m)}</small>}
+            {isTeam&&<small className="hcap">(복식) 부수합 차이에 -1 (최대 핸디 3개) · 부수차이 : 1 → 핸디없음, 2 → 1점, 3~4 → 2점, 5~7 → 3점</small>}</div>
+          <div className="sheet-tb">탁구대<br/>______</div>
+        </div>
+        {isTeam?<>
+          <div className="kstm">{[m.a,m.b].map((p,i)=><div key={i}>{i?"B":"A"}팀 <Who p={p}/><RosterLine m={p} cls="pro"/></div>)}</div>
+          <table className="kst"><thead><tr><th>경기</th><th>종목</th><th>A팀 선수</th><th>B팀 선수</th>{[1,2,3,4,5].map(n=><th key={n}>{n}세트</th>)}<th>승리팀</th></tr></thead>
+            <tbody>{["단식","복식","단식"].map((t,i)=><tr key={i}><td>{i+1}</td><td>{t}</td><td style={{width:"14%"}}></td><td style={{width:"14%"}}></td><SC/><td></td></tr>)}</tbody></table>
+        </>:
+          <table className="kst"><thead><tr><th>구분</th><th>선수</th>{[1,2,3,4,5].map(n=><th key={n}>{n}세트</th>)}<th>세트 합계</th><th>승</th></tr></thead>
+            <tbody>{[m.a,m.b].map((p,i)=><tr key={i}><td>{i?"B":"A"}</td><td className="kn"><Who p={p}/></td>{[1,2,3,4,5].map(n=><td className="sc" key={n}></td>)}<td></td><td></td></tr>)}</tbody></table>}
+        <div className="ksf"><span>승자 : ______________</span><span>최종 스코어 (&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;)</span><span>심판 : ____________ (서명)</span></div>
+      </div>
+      <div className="no-print" style={{marginTop:6}}><button className="btn btn-sm" onClick={()=>{setOnly(m.key);setTimeout(()=>window.print(),300);}}>이 경기만 인쇄</button></div>
+    </div>)}</div>
+  </>;
 }
 
 /* ---------- 참가 신청 ---------- */
@@ -896,11 +965,14 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
       <div className="tabs no-print">
         <button className={pmode==="prelim"?"on":""} onClick={()=>setPmode("prelim")}>예선 오더지</button>
         <button className={pmode==="knock"?"on":""} onClick={()=>setPmode("knock")}>본선 대진표</button>
+        <button className={pmode==="ksheet"?"on":""} onClick={()=>setPmode("ksheet")}>본선 경기 기록지</button>
         <button className="btn btn-p btn-sm" style={{marginLeft:"auto"}} onClick={()=>window.print()}>인쇄 / PDF 저장</button>
       </div>
-      <div className={"card"+(pmode==="prelim"?" pp":"")}>
-        <h2 className={pmode==="prelim"?"no-print":""} style={{textAlign:"center"}}>서울소방 탁구동호회 대회 · {EVLABEL[ev]} {pmode==="prelim"?"예선 오더지":"본선 대진표"}</h2>
-        {pmode==="prelim"
+      <div className={"card"+(pmode!=="knock"?" pp":"")}>
+        <h2 className={pmode!=="knock"?"no-print":""} style={{textAlign:"center"}}>서울소방 탁구동호회 대회 · {EVLABEL[ev]} {pmode==="prelim"?"예선 오더지":pmode==="ksheet"?"본선 경기 기록지":"본선 대진표"}</h2>
+        {pmode==="ksheet"
+          ? <KnockSheet state={st} byId={byId} evLabel={EVLABEL[ev]} title={(meta&&meta.title)||"서울소방 탁구대회"} divs={divs}/>
+          : pmode==="prelim"
           ? <PrelimSheet state={st} byId={byId} evLabel={EVLABEL[ev]} title={(meta&&meta.title)||"서울소방 탁구대회"}/>
           : (divs.length===0?<p className="muted" style={{textAlign:"center"}}>본선 대진이 없습니다.</p>
              : divs.map(d=>{const rounds=buildRounds(seedsFromSnap(st,d,byId),(st.knockWinners||{})[d]||{});
