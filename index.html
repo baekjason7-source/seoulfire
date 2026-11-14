@@ -206,7 +206,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-14b";
+const BUILD="2026-11-14c";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -352,7 +352,10 @@ function advancersOf(st,div,byId){
   return seeds;
 }
 function seedsFromSnap(st,div,byId){const gs={};(st.groups||[]).forEach(g=>gs[g.id]=g);
-  return ((st.knockSeeds||{})[div]||[]).map(id=>{if(String(id)[0]==="@"){const [,gid,r]=String(id).split("@");const g=gs[gid];return g?phSeed(g,+r):null;}return byId[id];}).filter(Boolean);}
+  return ((st.knockSeeds||{})[div]||[]).map(id=>{if(String(id)[0]==="@"){const [,gid,r]=String(id).split("@");const g=gs[gid];if(!g)return null;
+    /* 화면 표시 전용: 예선이 끝난 조는 자리표시(A조 1위) 대신 실제 순위 선수 표시 — 저장된 대진 자리(knockSeeds)는 변경하지 않음 */
+    const lg=liveGroup(g,byId),pr=st.prelim||{};if(groupDone(lg,pr)){const s=standings(lg,pr)[+r];if(s&&byId[s.id])return byId[s.id];}
+    return phSeed(g,+r);}return byId[id];}).filter(Boolean);}
 function fixSeedClash(seeds,gmap){
   const nn=seeds.length; if(nn<3)return seeds;
   const size=nextPow2(nn),pos=seedPositions(size),arr=seeds.slice();
@@ -980,7 +983,13 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
     {tab==="knock"&&<div className="card">
       {divs.length===0?<p className="muted">먼저 조 편성·예선을 진행하세요.</p>:<>
         <div className="row no-print" style={{gap:8,marginBottom:8}}>
-          <button className="btn btn-p" onClick={genKnock}>본선 대진 생성</button>
+          {(()=>{const ks=st.knockSeeds||{},has=Object.keys(ks).some(d=>(ks[d]||[]).length),
+            nw=Object.values(st.knockWinners||{}).reduce((t,o)=>t+Object.keys(o||{}).length,0);
+          if(!has)return <button className="btn btn-p" onClick={genKnock}>본선 대진 생성</button>;
+          return <><button className="btn" style={{color:"#94a3b8",borderColor:"#cbd5e1"}} onClick={()=>{
+              const t=prompt(`⚠ 위험: 확정된 본선 대진표를 새로 계산해 덮어씁니다.\n· 대진 자리가 바뀔 수 있습니다.\n· 입력된 본선 승자 기록 ${nw}건이 모두 지워집니다.\n\n예선 결과는 이미 대진표에 자동 표시되므로 보통은 누를 필요가 없습니다.\n그래도 진행하려면 아래에 「다시생성」을 입력하세요.`);
+              if(t===null)return;if(t.trim()!=="다시생성")return alert("입력이 일치하지 않아 취소되었습니다. 대진표는 그대로입니다.");genKnock();}}>대진 다시 만들기(주의)</button>
+            <span style={{fontSize:12,color:"#1F4E79"}}>예선이 끝난 조는 본선 자리에 이름이 자동 표시됩니다 — 누를 필요 없음</span></>;})()}
           <button className={"btn "+(st.published?"":"btn-p")} onClick={togglePub}>{st.published?"비공개로 전환":"대진표 공개(확정)"}</button>
           <span style={{fontSize:12,color:st.published?"#047857":"#94a3b8"}}>{st.published?"● 참가자에게 공개 중":"○ 비공개 (참가자는 '확정 전' 표시)"}</span>
         </div>
