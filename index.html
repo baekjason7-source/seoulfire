@@ -141,6 +141,18 @@
   .otitle{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 8px;font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-.3px}
   .otitle img{height:40px;width:auto}
   .pmx-wrap{display:flex}
+  .kf{border-collapse:collapse;width:100%;table-layout:fixed;border:2px solid #111}
+  .kf td{border:1.5px solid #111;text-align:center;vertical-align:middle;padding:6px;font-size:14px}
+  .kf .kf-h{font-size:17px;font-weight:700;letter-spacing:2px}
+  .kf .kf-s{font-size:13px;color:#334155;height:34px}
+  .kf .kf-tb{height:26px}
+  .kf tr.kf-big td{height:120px}
+  .kf .kf-ref{vertical-align:top;padding-top:10px}
+  .kf .kf-sig{height:70px}
+  .kf tr.kf-res td{height:90px}
+  .kf-nm b{display:block;font-size:24px;letter-spacing:1px}
+  .kf-nm small{display:block;font-size:14px;color:#1F4E79;font-weight:700;margin-top:4px}
+  .kf-note{font-size:11px;color:#475569;margin-top:4px}
   .kst{border-collapse:collapse;width:100%;margin:0}
   .kst th,.kst td{border:1px solid #64748b;text-align:center;font-size:13px;padding:6px 4px}
   .kst th{background:#f1f5f9;font-size:12px}
@@ -175,6 +187,7 @@
     .pp .pmx .sum{width:13mm}
     .pp .pmx .rh{padding-left:6px}
     .pp .sord{padding:3mm 4mm}
+    .pp .ks .kf{flex:1;height:100%}
     .pp .ks .kst{flex:1}
     .pp .ks .kst td.sc{height:auto}
     body:not(:has(.pp)) .wrap{padding:10mm}
@@ -206,7 +219,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-14d";
+const BUILD="2026-11-14e";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -503,7 +516,7 @@ function Bracket({rounds,winners,onPick,readOnly}){
       <div className="brk-col" key={ri}><p>{roundName(ri,t)}</p>
         {round.map(m=>{const w=matchWinner(m,winners);
           const Side=({pl})=>(<button disabled={readOnly||!pl||pl.ph} className={w&&pl&&w.id===pl.id?"w":""}
-            onClick={()=>pl&&!pl.ph&&onPick&&onPick(m.id,pl.id)}>{pl?(pl.ph?<span style={{color:"#64748b"}}>{pl.name}</span>:pl.name):<span className="muted">{m.bye?"부전승":"미정"}</span>}</button>);
+            onClick={()=>pl&&!pl.ph&&onPick&&onPick(m.id,pl.id)}>{pl?(pl.ph?<span style={{color:"#64748b"}}>{pl.name}</span>:<>{pl.name}{pl.div&&!rosterOf(pl)?<span style={{fontSize:11,color:"#64748b",marginLeft:4}}>({pl.div})</span>:null}</>):<span className="muted">{m.bye?"부전승":"미정"}</span>}</button>);
           return <div className="brk-m" key={m.id}><Side pl={m.a}/><Side pl={m.b}/></div>;})}
       </div>))}
     {champ&&<div style={{display:"flex",flexDirection:"column",justifyContent:"center"}}><p style={{fontSize:12,color:"#94a3b8",textAlign:"center"}}>우승</p><div className="champ">🏆 {champ.name}</div></div>}
@@ -565,49 +578,48 @@ function knockMatches(st,byId,divs){const out=[];
       const pa=ri>0?rounds[ri-1][mi*2]:null,pb=ri>0?rounds[ri-1][mi*2+1]:null;
       k++;const rn=roundName(ri,rounds.length),nm=round.length>1?`${rn} ${k}경기`:rn;lab[m.id]=nm;
       const side=(p,prev)=>p?p:{id:"tbd",name:prev&&lab[prev.id]?`${lab[prev.id]} 승자`:"미정",ph:true};
-      out.push({key:d+"|"+m.id,div:d,round:rn,name:nm,a:side(m.a,pa),b:side(m.b,pb),done:!!(m.a&&m.b&&matchWinner(m,w))});
+      out.push({key:d+"|"+m.id,div:d,ri,gang:round.length*2,round:rn,name:nm,a:side(m.a,pa),b:side(m.b,pb),done:!!(m.a&&m.b&&matchWinner(m,w))});
     });});});
   return out;}
 function KnockSheet({state,byId,evLabel,title,divs}){
-  const [fd,setFd]=useState(""),[fr,setFr]=useState(""),[mode,setMode]=useState("wait"),[only,setOnly]=useState(null);
+  const [fd,setFd]=useState(""),[fr,setFr]=useState(0),[mode,setMode]=useState("ready"),[only,setOnly]=useState(null);
   useEffect(()=>{const f=()=>setOnly(null);window.addEventListener("afterprint",f);return()=>window.removeEventListener("afterprint",f);},[]);
   const all=knockMatches(state,byId,divs);
   if(!all.length)return <p className="muted" style={{textAlign:"center"}}>[본선 대진 생성] 후 출력할 수 있습니다.</p>;
-  const ready=m=>!m.a.ph&&!m.b.ph,isTeam=evLabel==="단체전",rnames=[...new Set(all.map(m=>m.round))];
-  const list=only?all.filter(m=>m.key===only):all.filter(m=>(!fd||m.div===fd)&&(!fr||m.round===fr)&&(mode==="all"||(ready(m)&&(mode==="ready"||!m.done))));
+  const ready=m=>!m.a.ph&&!m.b.ph,isTeam=evLabel==="단체전";
+  const ris=[...new Set(all.filter(m=>!fd||m.div===fd).map(m=>m.ri))].sort((a,b)=>a-b);
+  const rlab=ri=>{const m=all.find(x=>x.ri===ri&&(!fd||x.div===fd));return `${ri+1}라운드`+(m?` (${m.gang===2?"결승":m.gang+"강"})`:"");};
+  const list=only?all.filter(m=>m.key===only):all.filter(m=>(!fd||m.div===fd)&&(fr<0||m.ri===fr)&&(mode==="all"||(ready(m)&&(mode==="ready"||!m.done))));
   const dn=p=>parseInt(p&&p.div)||0;
   const hcap=m=>{if(isTeam||!ready(m))return null;const x=dn(m.a),y=dn(m.b);if(!x||!y||x===y)return null;const wk=x>y?m.a:m.b;return `핸디: ${wk.name} ${Math.abs(x-y)}점 선취 (${m.a.div} vs ${m.b.div})`;};
-  const Who=({p})=><><b>{p.name}</b>{!p.ph&&<small>{p.org&&p.org!==p.name?p.org+" · ":""}{p.div}</small>}</>;
-  const SC=()=>[1,2,3,4,5].map(n=><td className="sc" key={n}>:</td>);
+  const Name=({p})=><div className="kf-nm"><b>{p.name}</b>{!p.ph&&<small>{p.div}{p.org&&p.org!==p.name?" · "+p.org:""}</small>}{isTeam&&<RosterLine m={p} cls="pro"/>}</div>;
   return <>
-    <div className="row no-print" style={{gap:8,marginBottom:10}}>
-      {only?<><b>선택한 1경기만 표시 중</b><button className="btn btn-sm" onClick={()=>setOnly(null)}>전체 목록으로</button></>:<>
-      <select value={fd} onChange={e=>setFd(e.target.value)} style={{width:"auto"}}><option value="">전체 부</option>{divs.map(d=><option key={d}>{d}</option>)}</select>
-      <select value={fr} onChange={e=>setFr(e.target.value)} style={{width:"auto"}}><option value="">전체 라운드</option>{rnames.map(r=><option key={r}>{r}</option>)}</select>
-      <select value={mode} onChange={e=>setMode(e.target.value)} style={{width:"auto"}}>
-        <option value="wait">진행 대기 경기(두 선수 확정·결과 미입력)</option><option value="ready">두 선수 확정된 경기 전체</option><option value="all">전체(미정 자리 포함)</option></select>
-      <span className="muted" style={{fontSize:12}}>{list.length}경기 · A4 1장에 2경기</span></>}
-    </div>
-    {list.length===0&&<p className="muted no-print">조건에 맞는 경기가 없습니다. 예선이 끝나지 않아 「A조 1위」처럼 표시된 경기는 [전체]에서 볼 수 있습니다.</p>}
-    <div>{list.map(m=><div className="half ks" key={m.key}>
-      <div className="otitle"><img src={LOGO} alt=""/><span>{title} {evLabel} 본선 경기 기록지</span></div>
-      <div className="sheet">
-        <div className="sheet-h">
-          <div className="sheet-g" style={{fontSize:18}}>{m.round}</div>
-          <div className="sheet-t">{evLabel} · {m.div} · {m.name}<small>본선 5전3선승 · 각 칸에 세트 점수(예: 11:7) 기록 · 부수 차이만큼 약자가 핸디(선취점) 적용</small>
-            {hcap(m)&&<small className="hcap">{hcap(m)}</small>}
-            {isTeam&&<small className="hcap">(복식) 부수합 차이에 -1 (최대 핸디 3개) · 부수차이 : 1 → 핸디없음, 2 → 1점, 3~4 → 2점, 5~7 → 3점</small>}</div>
-          <div className="sheet-tb">탁구대<br/>______</div>
-        </div>
-        {isTeam?<>
-          <div className="kstm">{[m.a,m.b].map((p,i)=><div key={i}>{i?"B":"A"}팀 <Who p={p}/><RosterLine m={p} cls="pro"/></div>)}</div>
-          <table className="kst"><thead><tr><th>경기</th><th>종목</th><th>A팀 선수</th><th>B팀 선수</th>{[1,2,3,4,5].map(n=><th key={n}>{n}세트</th>)}<th>승리팀</th></tr></thead>
-            <tbody>{["단식","복식","단식"].map((t,i)=><tr key={i}><td>{i+1}</td><td>{t}</td><td style={{width:"14%"}}></td><td style={{width:"14%"}}></td><SC/><td></td></tr>)}</tbody></table>
-        </>:
-          <table className="kst"><thead><tr><th>구분</th><th>선수</th>{[1,2,3,4,5].map(n=><th key={n}>{n}세트</th>)}<th>세트 합계</th><th>승</th></tr></thead>
-            <tbody>{[m.a,m.b].map((p,i)=><tr key={i}><td>{i?"B":"A"}</td><td className="kn"><Who p={p}/></td>{[1,2,3,4,5].map(n=><td className="sc" key={n}></td>)}<td></td><td></td></tr>)}</tbody></table>}
-        <div className="ksf"><span>승자 : ______________</span><span>최종 스코어 (&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;)</span><span>심판 : ____________ (서명)</span></div>
+    <div className="no-print" style={{marginBottom:10}}>
+      {only?<div className="row" style={{gap:8}}><b>선택한 1경기만 표시 중</b><button className="btn btn-sm" onClick={()=>setOnly(null)}>전체 목록으로</button></div>:<>
+      <div className="tabs" style={{marginBottom:6}}>
+        {ris.map(ri=><button key={ri} className={fr===ri?"on":""} onClick={()=>setFr(ri)}>{rlab(ri)}</button>)}
+        <button className={fr<0?"on":""} onClick={()=>setFr(-1)}>전체 라운드</button>
       </div>
+      <div className="row" style={{gap:8}}>
+        <select value={fd} onChange={e=>setFd(e.target.value)} style={{width:"auto"}}><option value="">전체 부</option>{divs.map(d=><option key={d}>{d}</option>)}</select>
+        <select value={mode} onChange={e=>setMode(e.target.value)} style={{width:"auto"}}>
+          <option value="ready">두 선수 확정된 경기</option><option value="wait">결과 미입력 경기만</option><option value="all">전체(미정 자리 포함)</option></select>
+        <span className="muted" style={{fontSize:12}}>{list.length}경기 · A4 1장에 2경기 · [인쇄 / PDF 저장]으로 출력</span>
+      </div></>}
+    </div>
+    {list.length===0&&<p className="muted no-print">해당 라운드에 출력할 경기가 없습니다. 앞 라운드 결과가 입력되어야 두 선수가 정해집니다(미정 자리까지 보려면 「전체」 선택).</p>}
+    <div>{list.map(m=><div className="half ks" key={m.key}>
+      <div className="otitle"><img src={LOGO} alt=""/><span>{title} {evLabel} 본선 대진표</span></div>
+      <table className="kf">
+        <colgroup><col style={{width:"40%"}}/><col style={{width:"20%"}}/><col style={{width:"40%"}}/></colgroup>
+        <tbody>
+          <tr><td className="kf-s">{m.div}</td><td className="kf-h">본선 ( {m.gang===2?"결승":m.gang} ){m.gang===2?"":"강"}</td><td className="kf-s">{m.name}</td></tr>
+          <tr><td className="kf-h">성 명</td><td className="kf-h">탁번<div className="kf-tb"></div></td><td className="kf-h">성 명</td></tr>
+          <tr className="kf-big"><td><Name p={m.a}/></td><td className="kf-h kf-ref">심판확인<div className="kf-sig"></div></td><td><Name p={m.b}/></td></tr>
+          <tr className="kf-res"><td></td><td className="kf-h">결 과</td><td></td></tr>
+        </tbody>
+      </table>
+      <div className="kf-note">본선 5전3선승 · 결과 칸에 세트 점수 기록{hcap(m)?" · "+hcap(m):""}{isTeam?" · (복식) 부수합 차이에 -1, 최대 핸디 3개":""}</div>
       <div className="no-print" style={{marginTop:6}}><button className="btn btn-sm" onClick={()=>{setOnly(m.key);setTimeout(()=>window.print(),300);}}>이 경기만 인쇄</button></div>
     </div>)}</div>
   </>;
