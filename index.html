@@ -190,7 +190,11 @@
     .pp .pmx .sum{width:13mm}
     .pp .pmx .rh{padding-left:6px}
     .pp .sord{padding:3mm 4mm}
-    .pp .ks .kf{flex:1;height:100%}
+    .pp .ks .kf{flex:none;height:auto}
+    .pp .ks .kf tr.kf-top td{height:10mm}
+    .pp .ks .kf tr.kf-lab td{height:11mm}
+    .pp .ks .kf tr.kf-big td{height:36mm}
+    .pp .ks .kf tr.kf-res td{height:42mm}
     .pp .ks .kst{flex:1}
     .pp .ks .kst td.sc{height:auto}
     body:not(:has(.pp)) .wrap{padding:10mm}
@@ -225,7 +229,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-14g";
+const BUILD="2026-11-14h";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -619,8 +623,8 @@ function KnockSheet({state,byId,evLabel,title,divs}){
       <table className="kf">
         <colgroup><col style={{width:"40%"}}/><col style={{width:"20%"}}/><col style={{width:"40%"}}/></colgroup>
         <tbody>
-          <tr><td className="kf-s">{m.div}</td><td className="kf-h">본선 ( {m.gang===2?"결승":m.gang} ){m.gang===2?"":"강"}</td><td className="kf-s">{m.name}</td></tr>
-          <tr><td className="kf-h">성 명</td><td className="kf-h">탁번<div className="kf-tb"></div></td><td className="kf-h">성 명</td></tr>
+          <tr className="kf-top"><td className="kf-s">{m.div}</td><td className="kf-h">본선 ( {m.gang===2?"결승":m.gang} ){m.gang===2?"":"강"}</td><td className="kf-s">{m.name}</td></tr>
+          <tr className="kf-lab"><td className="kf-h">성 명</td><td className="kf-h">탁번 (&nbsp;&nbsp;&nbsp;&nbsp;)</td><td className="kf-h">성 명</td></tr>
           <tr className="kf-big"><td><Name p={m.a}/></td><td className="kf-h kf-ref">심판확인<div className="kf-sig"></div></td><td><Name p={m.b}/></td></tr>
           <tr className="kf-res"><td></td><td className="kf-h">결 과</td><td></td></tr>
         </tbody>
