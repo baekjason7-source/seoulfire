@@ -206,7 +206,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-14a";
+const BUILD="2026-11-14b";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -423,6 +423,13 @@ function Matrix({group,prelim,byId,adv,onScore,bo,readOnly}){
   const rankOf=id=>st.findIndex(s=>s.id===id)+1;
   const rec=id=>st.find(s=>s.id===id)||{win:0,loss:0,played:0,sw:0,sl:0};
   const pairs=matchOrder(members.map(m=>m.id),group.id).map(([a,b])=>[byId[a],byId[b]]);
+  /* 교차표 칸을 눌러 바로 입력 — 아래 경기 순서 입력과 같은 저장 방식(onScore) 사용 */
+  const [sel,setSel]=useState(null);
+  const sp=sel&&members.find(m=>m.id===sel[0]),sq=sel&&members.find(m=>m.id===sel[1]);
+  const sr=sp&&sq?matchRes(prelim,group.id,sp.id,sq.id):null;
+  const put=(sx,sy,px,py)=>onScore(group.id,sp.id,sq.id,sx,sy,px,py);
+  const quick=bo===5?[[3,0],[3,1],[3,2],[2,3],[1,3],[0,3]]:[[2,0],[2,1],[1,2],[0,2]];
+  const ordNo=sp&&sq?pairs.findIndex(([a,b])=>(a.id===sp.id&&b.id===sq.id)||(a.id===sq.id&&b.id===sp.id))+1:0;
   return (<>
     <table className="mx">
       <thead><tr>
@@ -436,12 +443,34 @@ function Matrix({group,prelim,byId,adv,onScore,bo,readOnly}){
             <th className="mx-rh">{rp.name}{rp.org&&rp.org!==rp.name?<span>{rp.org}</span>:null}</th>
             {members.map(cp=>{if(rp.id===cp.id)return <td className="mx-diag" key={cp.id}></td>;
               const m=matchRes(prelim,group.id,rp.id,cp.id);
-              return <td key={cp.id} className={"mx-c ro "+(m&&m.win===rp.id?"mx-w":m?"mx-l":"")}>{m?m.sx:""}</td>;})}
+              const on=sel&&sel[0]===rp.id&&sel[1]===cp.id;
+              return <td key={cp.id} className={"mx-c ro "+(m&&m.win===rp.id?"mx-w":m?"mx-l":"")}
+                style={readOnly?undefined:{cursor:"pointer",outline:on?"3px solid #1F4E79":undefined,outlineOffset:-3,background:on?"#e0ecf8":undefined}}
+                onClick={readOnly?undefined:()=>setSel(on?null:[rp.id,cp.id])}>{m?m.sx:""}</td>;})}
             <td>{r.win}-{r.loss}</td><td>{r.sw}-{r.sl}</td>
             <td className={"mx-r "+(a&&r.played?"mx-adv":"")}>{r.played?rk:"-"}</td>
           </tr>;})}
       </tbody>
     </table>
+    {!readOnly&&(sp&&sq?<div className="no-print" style={{border:"2px solid #1F4E79",borderRadius:8,padding:"8px 10px",margin:"8px 0",background:"#f5f9fd"}}>
+        <div style={{fontSize:12,color:"#1F4E79",fontWeight:700,marginBottom:4}}>칸 입력{ordNo?` · ${ordNo}번 경기`:""} ({bo===5?"5전3승":"3전2승"})</div>
+        <div className="ord-row">
+          <span className="ord-nm r"><b>{sp.name}</b></span>
+          <input className="ord-in" type="number" min="0" autoFocus value={sr&&sr.sx!=null?sr.sx:""} onChange={e=>put(e.target.value,sr?sr.sy:"",sr?sr.px:"",sr?sr.py:"")}/>
+          <span>:</span>
+          <input className="ord-in" type="number" min="0" value={sr&&sr.sy!=null?sr.sy:""} onChange={e=>put(sr?sr.sx:"",e.target.value,sr?sr.px:"",sr?sr.py:"")}/>
+          <span className="ord-nm"><b>{sq.name}</b></span>
+          <input className="ord-pt" type="number" min="0" placeholder="득점" value={sr&&sr.px!=null?sr.px:""} onChange={e=>put(sr?sr.sx:"",sr?sr.sy:"",e.target.value,sr?sr.py:"")}/>
+          <span>:</span>
+          <input className="ord-pt" type="number" min="0" placeholder="득점" value={sr&&sr.py!=null?sr.py:""} onChange={e=>put(sr?sr.sx:"",sr?sr.sy:"",sr?sr.px:"",e.target.value)}/>
+        </div>
+        <div className="row" style={{gap:6,marginTop:6}}>
+          <span className="muted" style={{fontSize:12}}>빠른 입력</span>
+          {quick.map(([x,y])=><button key={x+":"+y} className="btn btn-sm" onClick={()=>put(x,y,sr?sr.px:"",sr?sr.py:"")}>{x}:{y}</button>)}
+          <button className="btn btn-sm btn-d" onClick={()=>{if(sr&&confirm("이 경기 결과를 지울까요?"))put("","","","");}}>지우기</button>
+          <button className="btn btn-sm btn-p" style={{marginLeft:"auto"}} onClick={()=>setSel(null)}>완료</button>
+        </div>
+      </div>:<p className="muted no-print" style={{fontSize:12,margin:"6px 0"}}>※ 교차표 칸을 누르면 그 자리에서 바로 결과를 입력할 수 있습니다(가로줄 선수 기준 점수).</p>)}
     {(()=>{const ps=[];for(let i=0;i<members.length;i++)for(let j=i+1;j<members.length;j++){const h=handicap(members[i].div,members[j].div);if(h>0){const lo=dnum(members[i].div)>dnum(members[j].div)?members[i]:members[j];ps.push({lo,h});}}return ps.length?<div className="mx-hd"><b>핸디</b> {ps.map((p,k)=><span key={k}>{p.lo.name} +{p.h}{k<ps.length-1?" / ":""}</span>)}</div>:null;})()}
     <div className="mx-order">
       <b>경기 순서</b> <span className="muted" style={{fontSize:11}}>({bo===5?"5전3승":"3전2승"})</span>
