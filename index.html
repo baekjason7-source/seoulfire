@@ -226,10 +226,10 @@ const EVACT=(meta)=>{const a=(meta&&Array.isArray(meta.events)&&meta.events.leng
 const DIVS = ["1부","2부","3부","4부","5부","6부"];
 const dnum=d=>parseInt(d)||0;
 const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
-const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
+const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"],game:"예선 3전2선승(조별리그) · 본선 5전3선승(토너먼트)",elig:"현 서울소방 직원·전직·가족(직계 존비속) · 의소대원 불가",hcap:"개인단식 : 부수 차이만큼 약자가 선취점 (예: 1부 vs 3부 → 2점). 단체전 복식 : 부수합 차이 1→0, 2→1, 3~4→2, 5~7→3 (최대 3점). 60세 이상 1부수 하향 가능.",gear:"엑시옴 브라보 40mm 백색구 · ITTF 공인 라켓/러버 · 스피드글루·벤졸 등 유해 화합물 금지.",tables:"12"};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-14j";
+const BUILD="2026-11-14l";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -419,6 +419,8 @@ async function fetchAll(){
     const e=k.slice(0,i1),rest=k.slice(i1+1),i2=rest.indexOf('#');if(i2<0)return;
     const kind=rest.slice(0,i2),id=rest.slice(i2+1),s=put(e),d=r.data||{};
     if(kind==='r'){s.prelim=s.prelim||{};s.prelim[id]=d;}
+    else if(kind==='m'){const j=id.indexOf('#');if(j<0)return;const dvv=id.slice(0,j),mid=id.slice(j+1);
+      s.knockMeta=s.knockMeta||{};s.knockMeta[dvv]=s.knockMeta[dvv]||{};s.knockMeta[dvv][mid]=d;}
     else if(kind==='k'){const j=id.indexOf('#');if(j<0)return;
       const dvv=id.slice(0,j),mid=id.slice(j+1);s.knockWinners=s.knockWinners||{};
       s.knockWinners[dvv]=s.knockWinners[dvv]||{};if(d.w)s.knockWinners[dvv][mid]=d.w;}});
@@ -430,7 +432,7 @@ const listArchives=async()=>{const r=chk(await sb.from('tstate').select('*').lik
   return (r.data||[]).map(x=>({key:x.event,...(x.data||{})})).sort((a,b)=>String(b.savedAt||"").localeCompare(String(a.savedAt||"")));};
 const saveArchive=async(key,data)=>chk(await sb.from('tstate').upsert({event:key,data,updated_at:new Date().toISOString()}));
 // 종목 기본 상태: 경기 결과는 제외하고 저장(경기 결과는 경기별 행으로 따로 저장)
-const saveState=async(event,data)=>{const d={...data};delete d.prelim;delete d.knockWinners;delete d._lp;delete d._lk;
+const saveState=async(event,data)=>{const d={...data};delete d.prelim;delete d.knockWinners;delete d.knockMeta;delete d._lp;delete d._lk;
   return chk(await sb.from('tstate').upsert({event,data:d,updated_at:new Date().toISOString()}));};
 const saveResult=async(ev,mkey,val)=>{const key=ev+'#r#'+mkey;
   if(val==null)return chk(await sb.from('tstate').delete().eq('event',key));
@@ -438,6 +440,9 @@ const saveResult=async(ev,mkey,val)=>{const key=ev+'#r#'+mkey;
 const saveKnockRow=async(ev,dvv,mid,w)=>{const key=ev+'#k#'+dvv+'#'+mid;
   if(w==null)return chk(await sb.from('tstate').delete().eq('event',key));
   return chk(await sb.from('tstate').upsert({event:key,data:{w:w},updated_at:new Date().toISOString()}));};
+const saveMatchMeta=async(ev,dvv,mid,v)=>{const key=ev+'#m#'+dvv+'#'+mid;
+  if(v==null)return chk(await sb.from('tstate').delete().eq('event',key));
+  return chk(await sb.from('tstate').upsert({event:key,data:v,updated_at:new Date().toISOString()}));};
 const delRows=async(keys)=>{if(!keys||!keys.length)return;return chk(await sb.from('tstate').delete().in('event',keys));};
 const addEntry   =async row=>chk(await sb.from('entries').insert(row));
 const updateEntry=async(id,patch)=>chk(await sb.from('entries').update(patch).eq('id',id));
@@ -525,15 +530,18 @@ function Matrix({group,prelim,byId,adv,onScore,bo,readOnly}){
 }
 
 /* ---------- 본선 대진표 ---------- */
-function Bracket({rounds,winners,onPick,readOnly}){
+function Bracket({rounds,winners,onPick,readOnly,meta}){
+  const km=meta||{};
   const t=rounds.length, champ=matchWinner(rounds[t-1][0],winners);
   return (<div className="scroll"><div className="brk">
     {rounds.map((round,ri)=>(
       <div className="brk-col" key={ri}><p>{roundName(ri,t)}</p>
-        {round.map(m=>{const w=matchWinner(m,winners);
-          const Side=({pl})=>(<button disabled={readOnly||!pl||pl.ph} className={w&&pl&&w.id===pl.id?"w":""}
-            onClick={()=>pl&&!pl.ph&&onPick&&onPick(m.id,pl.id)}>{pl?(pl.ph?<span style={{color:"#64748b"}}>{pl.name}</span>:<>{pl.name}{pl.div&&!rosterOf(pl)?<span style={{fontSize:11,color:"#64748b",marginLeft:4}}>({pl.div})</span>:null}</>):<span className="muted">{m.bye?"부전승":"미정"}</span>}</button>);
-          return <div className="brk-m" key={m.id}><Side pl={m.a}/><Side pl={m.b}/></div>;})}
+        {round.map(m=>{const w=matchWinner(m,winners),mm=km[m.id]||{},hasSc=mm.sa!=null&&mm.sb!=null;
+          const Side=({pl,sc})=>(<button disabled={readOnly||!pl||pl.ph} className={w&&pl&&w.id===pl.id?"w":""}
+            onClick={()=>pl&&!pl.ph&&onPick&&onPick(m.id,pl.id)}>{pl?(pl.ph?<span style={{color:"#64748b"}}>{pl.name}</span>:<>{pl.name}{pl.div&&!rosterOf(pl)?<span style={{fontSize:11,color:"#64748b",marginLeft:4}}>({pl.div})</span>:null}</>):<span className="muted">{m.bye?"부전승":"미정"}</span>}{hasSc&&pl?<b style={{float:"right"}}>{sc}</b>:null}</button>);
+          return <div className="brk-m" key={m.id} style={mm.t&&!w?{borderColor:"#1F4E79",boxShadow:"0 0 0 2px #bfdbfe"}:undefined}>
+            {mm.t&&!w&&<div style={{background:"#1F4E79",color:"#fff",fontSize:11,padding:"2px 8px"}}>🏓 {mm.t}번 탁구대 · 경기 중</div>}
+            <Side pl={m.a} sc={mm.sa}/><Side pl={m.b} sc={mm.sb}/></div>;})}
       </div>))}
     {champ&&<div style={{display:"flex",flexDirection:"column",justifyContent:"center"}}><p style={{fontSize:12,color:"#94a3b8",textAlign:"center"}}>우승</p><div className="champ">🏆 {champ.name}</div></div>}
   </div></div>);
@@ -594,7 +602,7 @@ function knockMatches(st,byId,divs){const out=[];
       const pa=ri>0?rounds[ri-1][mi*2]:null,pb=ri>0?rounds[ri-1][mi*2+1]:null;
       k++;const rn=roundName(ri,rounds.length),nm=round.length>1?`${rn} ${k}경기`:rn;lab[m.id]=nm;
       const side=(p,prev)=>p?p:{id:"tbd",name:prev&&lab[prev.id]?`${lab[prev.id]} 승자`:"미정",ph:true};
-      out.push({key:d+"|"+m.id,div:d,ri,gang:round.length*2,round:rn,name:nm,a:side(m.a,pa),b:side(m.b,pb),done:!!(m.a&&m.b&&matchWinner(m,w))});
+      out.push({key:d+"|"+m.id,t:(((st.knockMeta||{})[d]||{})[m.id]||{}).t,div:d,ri,gang:round.length*2,round:rn,name:nm,a:side(m.a,pa),b:side(m.b,pb),done:!!(m.a&&m.b&&matchWinner(m,w))});
     });});});
   return out;}
 function KnockSheet({state,byId,evLabel,title,divs}){
@@ -630,7 +638,7 @@ function KnockSheet({state,byId,evLabel,title,divs}){
         <colgroup><col style={{width:"40%"}}/><col style={{width:"20%"}}/><col style={{width:"40%"}}/></colgroup>
         <tbody>
           <tr className="kf-top"><td className="kf-s">{m.div}</td><td className="kf-h">본선 ( {m.gang===2?"결승":m.gang} ){m.gang===2?"":"강"}</td><td className="kf-s">{m.name}</td></tr>
-          <tr className="kf-lab"><td className="kf-h">성 명</td><td className="kf-h">탁번 (&nbsp;&nbsp;&nbsp;&nbsp;)</td><td className="kf-h">성 명</td></tr>
+          <tr className="kf-lab"><td className="kf-h">성 명</td><td className="kf-h">탁번 ({m.t?" "+m.t+" ":<>&nbsp;&nbsp;&nbsp;&nbsp;</>})</td><td className="kf-h">성 명</td></tr>
           <tr className="kf-big"><td><Name p={m.a}/></td><td className="kf-h kf-ref">심판확인<div className="kf-sig"></div></td><td><Name p={m.b}/></td></tr>
           <tr className="kf-res"><td></td><td className="kf-h">결 과</td><td></td></tr>
         </tbody>
@@ -752,6 +760,8 @@ function PublicView({entries,states,reload,meta}){
   const st=states[ev]||{}, byId={}; entries.forEach(e=>byId[e.id]=e);
   const divs=divsOf(st); const [dv,setDv]=useState(""); const activeDiv=dv||divs[0]||"";
   const adv=st.advance||2;
+  const hasKnock=Object.keys(st.knockSeeds||{}).some(d=>((st.knockSeeds||{})[d]||[]).length);
+  const [pv,setPv]=useState("");const pmode=pv||(hasKnock?"knock":"prelim");
   return (<div className="card">
     <div className="row no-print" style={{justifyContent:"space-between"}}>
       <h2 style={{margin:0}}>대진표 보기</h2>
@@ -761,14 +771,21 @@ function PublicView({entries,states,reload,meta}){
     {!st.published
       ? <div className="msg" style={{background:"#f1f5f9",color:"#475569",textAlign:"center",padding:"30px 12px",fontSize:15,marginTop:12}}>🗓️ 대진표는 확정 전입니다.<br/><span className="muted" style={{fontSize:13}}>운영진이 대진을 확정하면 이곳에 공개됩니다.</span></div>
       : <>
-        <h3 style={{marginTop:16}}>예선 리그</h3>
-        {(st.groups||[]).length===0?<p className="muted">아직 조 편성 전입니다.</p>:
-          <div className="g2">{st.groups.map(g=><div className="scroll" key={g.id}><Matrix group={g} prelim={st.prelim||{}} byId={byId} adv={adv} bo={st.bo||3} readOnly/></div>)}</div>}
-        <h3 style={{marginTop:20}}>본선 대진</h3>
-        {divs.length===0?<p className="muted">본선 대진이 아직 없습니다.</p>:<>
+        <div className="tabs" style={{marginTop:12}}>
+          <button className={pmode==="knock"?"on":""} onClick={()=>setPv("knock")}>🏆 본선 대진</button>
+          <button className={pmode==="prelim"?"on":""} onClick={()=>setPv("prelim")}>예선 리그 결과</button></div>
+        {pmode==="prelim"&&((st.groups||[]).length===0?<p className="muted">아직 조 편성 전입니다.</p>:
+          <div className="g2">{st.groups.map(g=><div className="scroll" key={g.id}><Matrix group={g} prelim={st.prelim||{}} byId={byId} adv={adv} bo={st.bo||3} readOnly/></div>)}</div>)}
+        {pmode==="knock"&&(divs.length===0?<p className="muted">본선 대진이 아직 없습니다.</p>:<>
           <div className="tabs">{divs.map(d=><button key={d} className={activeDiv===d?"on":""} onClick={()=>setDv(d)}>{d}</button>)}</div>
-          {(()=>{const rounds=buildRounds(seedsFromSnap(st,activeDiv,byId),(st.knockWinners||{})[activeDiv]||{});return rounds.length?<Bracket rounds={rounds} winners={(st.knockWinners||{})[activeDiv]||{}} readOnly/>:<p className="muted">본선 대진 준비 중입니다.</p>;})()}
-        </>}
+          {(()=>{const km=(st.knockMeta||{})[activeDiv]||{},ms=knockMatches(st,byId,[activeDiv]).filter(m=>!m.done&&!m.a.ph&&!m.b.ph),
+              mid=m=>m.key.slice(m.key.indexOf("|")+1),on=ms.filter(m=>(km[mid(m)]||{}).t).sort((a,b)=>km[mid(a)].t-km[mid(b)].t),wait=ms.filter(m=>!(km[mid(m)]||{}).t);
+            return (on.length||wait.length)?<div style={{background:"#f8fbff",border:"1px solid #bfdbfe",borderRadius:8,padding:"8px 10px",margin:"6px 0 10px",fontSize:13}}>
+              {on.map(m=><div key={m.key}>🏓 <b>{km[mid(m)].t}번 탁구대</b> · {m.name} : <b>{m.a.name}</b> vs <b>{m.b.name}</b> <span style={{color:"#1F4E79"}}>(경기 중)</span></div>)}
+              {wait.length>0&&<div className="muted" style={{marginTop:on.length?4:0}}>대기 {wait.length}경기 : {wait.map(m=>`${m.a.name} vs ${m.b.name}`).join(" / ")}</div>}
+            </div>:null;})()}
+          {(()=>{const rounds=buildRounds(seedsFromSnap(st,activeDiv,byId),(st.knockWinners||{})[activeDiv]||{});return rounds.length?<Bracket rounds={rounds} winners={(st.knockWinners||{})[activeDiv]||{}} meta={(st.knockMeta||{})[activeDiv]} readOnly/>:<p className="muted">본선 대진 준비 중입니다.</p>;})()}
+        </>)}
       </>}
   </div>);
 }
@@ -800,6 +817,12 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
   const [mf,setMf]=useState(meta);
   const saveMeta=async(nm)=>{setStates(s=>({...s,_meta:nm}));try{await saveState("_meta",nm);}catch(e){fail(e);}};
   const resKeys=()=>Object.keys(st.prelim||{}).map(k=>ev+'#r#'+k);
+  /* 대회 기록 저장 — 별도 행에 보관(연락처·계좌 제외), 진행 데이터는 변경 없음 */
+  const doArchive=async()=>{const title=(meta.title||"대회").trim(),key=ARCH+title+(meta.date?" "+meta.date:"");
+    const strip=e=>{const m={...(e.meta||{})};["p1","p2"].forEach(k=>{if(m[k])m[k]={...m[k],phone:""};});return {id:e.id,event:e.event,name:e.name,org:e.org,div:e.div,meta:m};};
+    const sts={};EVACT(meta).forEach(([k])=>{if(states[k]){const x={...states[k]};delete x._lp;delete x._lk;sts[k]=x;}});
+    const m2={...meta};delete m2.account;
+    await saveArchive(key,{meta:m2,savedAt:new Date().toISOString(),entries:entries.map(strip),states:sts});return key;};
   const kwKeys=()=>{const o=[],kw=st.knockWinners||{};Object.keys(kw).forEach(d=>Object.keys(kw[d]||{}).forEach(m=>o.push(ev+'#k#'+d+'#'+m)));return o;};
   const migRef=React.useRef({});
   useEffect(()=>{const lp=st._lp,lk=st._lk;if(!lp&&!lk)return;if(migRef.current[ev])return;migRef.current[ev]=1;
@@ -826,21 +849,43 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
     patchLocal({...st,prelim:np});
     saveResult(ev,key,val).catch(fail);};
   const divs=divsOf(st), activeDiv=dv||divs[0]||"";
-  /* 본선 승자 선택 — 같은 선수를 다시 누르면 취소. 변경·취소 시 그 경기에서 이어지는 다음 라운드 결과만 함께 지움(다른 경기 결과는 유지) */
-  const setKnock=(mid,pid)=>{const mm=mid.match(/^r(\d+)m(\d+)/),cur=(st.knockWinners||{})[activeDiv]||{},nw={...cur},down=[];
-    let rr=parseInt(mm[1]),ix=parseInt(mm[2]);while(rr<12){rr++;ix=Math.floor(ix/2);const k=`r${rr}m${ix}`;if(cur[k]!=null)down.push(k);}
-    const cancel=cur[mid]===pid,nm=(byId[pid]||{}).name||"";
-    if(cancel&&!confirm(`${nm} 승리를 취소할까요?`+(down.length?`\n(이 경기에서 이어진 다음 라운드 결과 ${down.length}건도 함께 취소됩니다)`:"")))return;
-    if(!cancel&&cur[mid]!=null&&cur[mid]!==pid&&down.length&&!confirm(`승자를 ${nm}(으)로 바꿉니다.\n이 경기에서 이어진 다음 라운드 결과 ${down.length}건이 함께 취소됩니다. 계속할까요?`))return;
-    down.forEach(k=>delete nw[k]);if(cancel)delete nw[mid];else nw[mid]=pid;
-    patchLocal({...st,knockWinners:{...(st.knockWinners||{}),[activeDiv]:nw}});
-    const drop=down.map(k=>ev+'#k#'+activeDiv+'#'+k);
-    (async()=>{try{await saveKnockRow(ev,activeDiv,mid,cancel?null:pid);if(drop.length)await delRows(drop);}catch(e){fail(e);}})();};
+  /* 본선 승자 선택 — 같은 선수를 다시 누르면 취소. 변경·취소 시 그 경기에서 이어지는 다음 라운드 결과만 함께 지움(다른 경기 결과는 유지)
+     score=[a측,b측] 이 주어지면 점수 입력으로 승자 확정(탁구대는 자동으로 빈 탁구대가 됨) */
+  const setKnock=(mid,pid,score)=>{const mm=mid.match(/^r(\d+)m(\d+)/),cur=(st.knockWinners||{})[activeDiv]||{},nw={...cur},down=[];
+    const kmeta=(st.knockMeta||{})[activeDiv]||{},nmeta={...kmeta};
+    let rr=parseInt(mm[1]),ix=parseInt(mm[2]);while(rr<12){rr++;ix=Math.floor(ix/2);const k=`r${rr}m${ix}`;if(cur[k]!=null||kmeta[k])down.push(k);}
+    const downW=down.filter(k=>cur[k]!=null);
+    const cancel=!score&&cur[mid]===pid,nm=(byId[pid]||{}).name||"";
+    if(cancel&&!confirm(`${nm} 승리를 취소할까요?`+(downW.length?`\n(이 경기에서 이어진 다음 라운드 결과 ${downW.length}건도 함께 취소됩니다)`:"")))return;
+    if(!cancel&&cur[mid]!=null&&cur[mid]!==pid&&downW.length&&!confirm(`승자를 ${nm}(으)로 바꿉니다.\n이 경기에서 이어진 다음 라운드 결과 ${downW.length}건이 함께 취소됩니다. 계속할까요?`))return;
+    const changed=cur[mid]!==pid||cancel;
+    (changed?down:[]).forEach(k=>{delete nw[k];delete nmeta[k];});
+    if(cancel)delete nw[mid];else nw[mid]=pid;
+    const base=nmeta[mid]?{t:nmeta[mid].t,at:nmeta[mid].at,lb:nmeta[mid].lb}:null;
+    if(score)nmeta[mid]={...(base||{}),sa:score[0],sb:score[1],end:Date.now()};
+    else if(nmeta[mid]&&nmeta[mid].sa!=null)nmeta[mid]=base; // 클릭으로 바꾸면 기존 점수는 지움
+    if(nmeta[mid]==null)delete nmeta[mid];
+    patchLocal({...st,knockWinners:{...(st.knockWinners||{}),[activeDiv]:nw},knockMeta:{...(st.knockMeta||{}),[activeDiv]:nmeta}});
+    const drop=(changed?down:[]).flatMap(k=>[ev+'#k#'+activeDiv+'#'+k,ev+'#m#'+activeDiv+'#'+k]);
+    (async()=>{try{await saveKnockRow(ev,activeDiv,mid,cancel?null:pid);
+      if(JSON.stringify(nmeta[mid]||null)!==JSON.stringify(kmeta[mid]||null))await saveMatchMeta(ev,activeDiv,mid,nmeta[mid]||null);
+      if(drop.length)await delRows(drop);}catch(e){fail(e);}})();};
+  /* 탁구대 배정(투입)·취소 */
+  const setTable=(mid,t,lb)=>{const kmeta=(st.knockMeta||{})[activeDiv]||{},nmeta={...kmeta};
+    if(t)nmeta[mid]={...(kmeta[mid]||{}),t:t,at:Date.now(),lb:lb};else{const o={...(kmeta[mid]||{})};delete o.t;delete o.at;delete o.lb;if(Object.keys(o).length)nmeta[mid]=o;else delete nmeta[mid];}
+    patchLocal({...st,knockMeta:{...(st.knockMeta||{}),[activeDiv]:nmeta}});
+    saveMatchMeta(ev,activeDiv,mid,nmeta[mid]||null).catch(fail);};
+  const venueT=Math.max(1,parseInt(meta.tables)||st.tables||12);
+  /* 모든 종목·부에서 사용 중인 탁구대(배정됐고 아직 승자 없음) */
+  const busyTables=()=>{const b={};EVACT(meta).forEach(([k,lbl])=>{const s2=k===ev?st:(states[k]||{}),km=s2.knockMeta||{},kw=s2.knockWinners||{};
+    Object.keys(km).forEach(d=>Object.keys(km[d]||{}).forEach(mid=>{const x=km[d][mid];if(x&&x.t&&!((kw[d]||{})[mid]))b[x.t]={ev:k,evl:lbl,d,mid,lb:x.lb||mid,at:x.at};}));});return b;};
+  const [ksc,setKsc]=useState({}),[selT,setSelT]=useState({});
   const genKnock=async()=>{const gmap={};(st.groups||[]).forEach(g=>{(g.members||[]).forEach(m=>gmap[m]=g.id);for(let r=0;r<10;r++)gmap[`@${g.id}@${r}`]=g.id;});
     const undone=(st.groups||[]).filter(g=>!groupDone(liveGroup(g,byId),st.prelim||{}));
     if(undone.length&&!confirm(`예선이 끝나지 않은 조 ${undone.length}개가 있습니다.\n해당 자리는 이름 대신 'A조 1위'처럼 표시됩니다.\n예선이 모두 끝난 뒤 [본선 대진 생성]을 다시 누르면 이름이 채워집니다. 계속할까요?`))return;
     const seeds={};divsOf(st).forEach(d=>{seeds[d]=fixSeedClash(advancersOf(st,d,byId),gmap).map(p=>p.id);});
-    const old=kwKeys(),nd={...st,knockSeeds:seeds,knockWinners:{}};
+    const km=st.knockMeta||{},mk=[];Object.keys(km).forEach(d=>Object.keys(km[d]||{}).forEach(m=>mk.push(ev+'#m#'+d+'#'+m)));
+    const old=[...kwKeys(),...mk],nd={...st,knockSeeds:seeds,knockWinners:{},knockMeta:{}};
     patchLocal(nd);try{await saveState(ev,nd);if(old.length)await delRows(old);}catch(e){fail(e);}};
   const togglePub=()=>patch({...st,published:!st.published});
   const togglePaid=async(e)=>{try{await updateEntry(e.id,{paid:!e.paid});await reload(true);}catch(er){fail(er);}};
@@ -1029,7 +1074,42 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
         </div>
         <p className="muted" style={{fontSize:12,marginTop:0}}>예선 순위대로 각 조 상위자가 다른 조 하위자와 맞붙도록 자동 배치. 인원수에 따라 상위 시드는 1회전 부전승 가능. 예선이 끝나지 않은 조는 「A조 1위」처럼 자리만 표시됩니다. 예선 종료 후 또는 결과를 수정했으면 [본선 대진 생성]을 다시 누르세요.</p>
         <div className="tabs no-print">{divs.map(d=><button key={d} className={activeDiv===d?"on":""} onClick={()=>setDv(d)}>{d}</button>)}</div>
-        {(()=>{const rounds=buildRounds(seedsFromSnap(st,activeDiv,byId),(st.knockWinners||{})[activeDiv]||{});return rounds.length?<Bracket rounds={rounds} winners={(st.knockWinners||{})[activeDiv]||{}} onPick={setKnock}/>:<p className="muted">[본선 대진 생성]을 눌러 대진을 만드세요.</p>;})()}
+        {(()=>{const ms=knockMatches(st,byId,[activeDiv]),km=(st.knockMeta||{})[activeDiv]||{},kw=(st.knockWinners||{})[activeDiv]||{},busy=busyTables();
+          if(!ms.length)return null;
+          const need=Math.ceil((st.kbo||5)/2),midOf=m=>m.key.slice(m.key.indexOf("|")+1);
+          const ready=ms.filter(m=>!m.a.ph&&!m.b.ph&&!m.done),playing=ready.filter(m=>(km[midOf(m)]||{}).t),waiting=ready.filter(m=>!(km[midOf(m)]||{}).t);
+          const free=[];for(let t=1;t<=venueT;t++)if(!busy[t])free.push(t);
+          const hm=ts=>{if(!ts)return"";const d=new Date(ts);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");};
+          const saveSc=m=>{const id=midOf(m),v=ksc[id]||[],x=parseInt(v[0]),y=parseInt(v[1]);
+            if(isNaN(x)||isNaN(y)||x===y)return alert("점수를 입력하세요. (예: 3 : 1)");
+            if(Math.max(x,y)!==need||Math.min(x,y)>=need){if(!confirm(`${need}선승 기준과 다른 점수(${x}:${y})입니다. 그대로 저장할까요?`))return;}
+            setKnock(id,(x>y?m.a:m.b).id,[x,y]);setKsc(o=>{const n={...o};delete n[id];return n;});};
+          const Nm=({p})=><b>{p.name}{p.div&&!rosterOf(p)?<span className="muted" style={{fontSize:11,fontWeight:400}}> ({p.div})</span>:null}</b>;
+          return <div className="card no-print" style={{borderLeft:"4px solid #1F4E79",background:"#f8fbff"}}>
+            <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}>
+              <h3 style={{margin:0}}>경기 운영 — 탁구대 배정 · 결과 입력</h3>
+              <label style={{fontSize:12}}>본선 경기 방식&nbsp;<select value={st.kbo||5} style={{width:"auto"}} onChange={e=>patch({...st,kbo:Number(e.target.value)})}><option value={5}>5전3승</option><option value={3}>3전2승</option><option value={7}>7전4승</option></select></label></div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,margin:"8px 0"}}>
+              {Array.from({length:venueT},(_,i)=>i+1).map(t=>{const b=busy[t];return <span key={t} title={b?`${b.evl} ${b.d} ${b.lb}`:"빈 탁구대"} style={{fontSize:11,padding:"3px 7px",borderRadius:6,background:b?"#fee2e2":"#dcfce7",color:b?"#b91c1c":"#166534",border:"1px solid "+(b?"#fca5a5":"#86efac")}}>{t}번 {b?(b.ev===ev&&b.d===activeDiv?"경기 중":b.evl+" 사용"):"빈 대"}</span>;})}</div>
+            <p className="muted" style={{fontSize:12,margin:"0 0 6px"}}>빈 탁구대 {free.length}대 / 전체 {venueT}대 (탁구대 수는 [대회설정]에서 변경) · 결과를 저장하면 그 탁구대는 자동으로 빈 대가 됩니다.</p>
+            <h4 style={{margin:"8px 0 4px"}}>진행 중 ({playing.length})</h4>
+            {playing.length===0&&<p className="muted" style={{fontSize:12,margin:0}}>투입된 경기가 없습니다.</p>}
+            {playing.map(m=>{const id=midOf(m),x=km[id]||{},v=ksc[id]||["",""];return <div key={m.key} className="ord-row" style={{borderBottom:"1px solid #e2e8f0",padding:"6px 0"}}>
+              <span className="pill" style={{background:"#1F4E79",color:"#fff"}}>🏓 {x.t}번</span><span className="muted" style={{fontSize:12}}>{m.name} · 투입 {hm(x.at)}</span>
+              <span style={{flexBasis:"100%",height:0}}></span>
+              <Nm p={m.a}/><input className="ord-in" type="number" min="0" value={v[0]} onChange={e=>setKsc(o=>({...o,[id]:[e.target.value,v[1]]}))}/>
+              <span>:</span><input className="ord-in" type="number" min="0" value={v[1]} onChange={e=>setKsc(o=>({...o,[id]:[v[0],e.target.value]}))}/><Nm p={m.b}/>
+              <button className="btn btn-sm btn-p" onClick={()=>saveSc(m)}>결과 저장</button>
+              <button className="btn btn-sm" onClick={()=>{if(confirm(`${x.t}번 탁구대 투입을 취소할까요?`))setTable(id,null);}}>투입 취소</button></div>;})}
+            <h4 style={{margin:"10px 0 4px"}}>대기 — 대진 확정, 탁구대 미배정 ({waiting.length})</h4>
+            {waiting.length===0&&<p className="muted" style={{fontSize:12,margin:0}}>대기 중인 경기가 없습니다.</p>}
+            {waiting.map(m=>{const id=midOf(m),sv=selT[id]||free[0]||"";return <div key={m.key} className="ord-row" style={{borderBottom:"1px solid #e2e8f0",padding:"6px 0"}}>
+              <span className="muted" style={{fontSize:12,minWidth:84}}>{m.name}</span><Nm p={m.a}/><span className="muted">vs</span><Nm p={m.b}/>
+              <select value={sv} style={{width:"auto"}} onChange={e=>setSelT(o=>({...o,[id]:e.target.value}))}>{free.length?free.map(t=><option key={t} value={t}>{t}번 탁구대</option>):<option value="">빈 탁구대 없음</option>}</select>
+              <button className="btn btn-sm btn-p" disabled={!sv} onClick={()=>{const t=parseInt(sv);if(busyTables()[t])return alert(`${t}번 탁구대는 사용 중입니다.`);setTable(id,t,`${m.name} · ${m.a.name} vs ${m.b.name}`);}}>투입</button></div>;})}
+            <p className="muted" style={{fontSize:12,margin:"8px 0 0"}}>완료 {ms.filter(m=>m.done).length}경기 · 아래 대진표에서 승자 이름을 직접 눌러도 됩니다(다시 누르면 취소).</p>
+          </div>;})()}
+        {(()=>{const rounds=buildRounds(seedsFromSnap(st,activeDiv,byId),(st.knockWinners||{})[activeDiv]||{});return rounds.length?<Bracket rounds={rounds} winners={(st.knockWinners||{})[activeDiv]||{}} meta={(st.knockMeta||{})[activeDiv]} onPick={setKnock}/>:<p className="muted">[본선 대진 생성]을 눌러 대진을 만드세요.</p>;})()}
       </>}
     </div>}
 
@@ -1053,7 +1133,7 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
                return <div key={d} className="kb-page" style={{marginBottom:24}}>
                  <div className="otitle kb-title"><img src={LOGO} alt=""/><span>{(meta&&meta.title)||"서울소방 탁구대회"} {EVLABEL[ev]} 본선 대진표</span></div>
                  <h3 style={{borderLeft:"4px solid #d32f2f",paddingLeft:8}}>{d} 본선 토너먼트</h3>
-                 {rounds.length?<div className="kb-fit" style={{zoom:kz}}><Bracket rounds={rounds} winners={(st.knockWinners||{})[d]||{}} readOnly/></div>:<p className="muted">진출자 부족</p>}
+                 {rounds.length?<div className="kb-fit" style={{zoom:kz}}><Bracket rounds={rounds} winners={(st.knockWinners||{})[d]||{}} meta={(st.knockMeta||{})[d]} readOnly/></div>:<p className="muted">진출자 부족</p>}
                </div>;}))}
       </div>
     </>}
@@ -1061,20 +1141,31 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
     {tab==="set"&&<div className="card" style={{borderLeft:"4px solid #1F4E79"}}>
       <h2 style={{marginTop:0}}>대회 기록 저장</h2>
       <p className="muted" style={{fontSize:13,marginTop:0}}>현재 참가자 명단·조 편성·예선/본선 결과를 [대회결과] 메뉴에 영구 보관합니다. 진행 중인 데이터는 바뀌지 않으며, 연락처는 저장하지 않습니다. 같은 대회명으로 다시 저장하면 최신 결과로 갱신됩니다.</p>
-      <button className="btn btn-p" onClick={async()=>{
-        const title=(meta.title||"대회").trim(),key=ARCH+title+(meta.date?" "+meta.date:"");
-        if(!confirm(`「${title}」 대회 기록을 저장할까요?\n(같은 이름의 기록이 있으면 최신 결과로 갱신됩니다)`))return;
-        const strip=e=>{const m={...(e.meta||{})};["p1","p2"].forEach(k=>{if(m[k])m[k]={...m[k],phone:""};});return {id:e.id,event:e.event,name:e.name,org:e.org,div:e.div,meta:m};};
-        const sts={};EVACT(meta).forEach(([k])=>{if(states[k]){const x={...states[k]};delete x._lp;delete x._lk;sts[k]=x;}});
-        const m2={...meta};delete m2.account;
-        try{await saveArchive(key,{meta:m2,savedAt:new Date().toISOString(),entries:entries.map(strip),states:sts});alert("대회 기록이 저장되었습니다. [대회결과] 메뉴에서 확인하세요.");}catch(e){fail(e);}}}>현재 대회 기록 저장</button>
+      <button className="btn btn-p" onClick={async()=>{if(!confirm(`「${(meta.title||"대회").trim()}」 대회 기록을 저장할까요?\n(같은 이름의 기록이 있으면 최신 결과로 갱신됩니다)`))return;
+        try{await doArchive();alert("대회 기록이 저장되었습니다. [대회결과] 메뉴에서 확인하세요.");}catch(e){fail(e);}}}>현재 대회 기록 저장</button>
+    </div>}
+
+    {tab==="set"&&<div className="card" style={{borderLeft:"4px solid #d32f2f"}}>
+      <h2 style={{marginTop:0}}>새 대회 준비</h2>
+      <p className="muted" style={{fontSize:13,marginTop:0}}>현재 대회를 자동으로 기록 저장한 뒤, 참가 신청·조 편성·예선/본선 결과를 비워 다음 대회를 받을 수 있게 합니다. 대회설정(대회명·요강)은 남아 있으니 아래에서 새 대회 내용으로 고쳐 저장하세요. 저장된 역대 기록은 지워지지 않습니다.</p>
+      <button className="btn btn-d" onClick={async()=>{
+        const n=entries.length;
+        const t=prompt(`⚠ 새 대회 준비\n1) 「${meta.title}」 기록을 [대회결과]에 자동 저장합니다.\n2) 참가 신청 ${n}건과 조 편성·경기 결과를 모두 비웁니다(되돌릴 수 없음).\n\n진행하려면 「새대회」를 입력하세요.`);
+        if(t===null)return;if(t.trim()!=="새대회")return alert("입력이 일치하지 않아 취소되었습니다.");
+        try{const key=await doArchive();const ar=await listArchives();if(!ar.some(x=>x.key===key))throw new Error("기록 저장 확인 실패 — 초기화를 중단했습니다.");
+          chk(await sb.from('tstate').delete().neq('event','_meta').not('event','like',ARCH+'%'));
+          chk(await sb.from('entries').delete().not('id','is',null));
+          const nm={...meta,closed:false};await saveState("_meta",nm);
+          alert("초기화가 끝났습니다. 아래 [대회 설정 · 안내]에서 새 대회명과 요강을 입력하고 [설정 저장]을 누르세요.\n이전 대회 기록은 [대회결과]에서 볼 수 있습니다.");
+          await reload();}catch(e){fail(e);}}}>현재 대회 기록 저장 후 새 대회 시작</button>
     </div>}
 
     {tab==="set"&&<div className="card">
       <h2>대회 설정 · 안내</h2>
       <p className="muted" style={{fontSize:13,marginTop:0}}>여기서 저장한 내용이 [대회안내] 화면과 신청 화면에 표시됩니다.</p>
-      {[["title","대회명"],["date","일시"],["place","장소"],["host","주최·주관"],["fee","참가비"],["account","입금계좌"],["deadline","신청마감"],["contact","문의"]].map(([k,lbl])=>
+      {[["title","대회명"],["date","일시"],["place","장소"],["host","주최·주관"],["game","게임방법"],["elig","참가자격"],["fee","참가비"],["account","입금계좌"],["deadline","신청마감"],["contact","문의"],["tables","탁구대 수(본선 배정용)"]].map(([k,lbl])=>
         <div key={k} style={{marginBottom:8}}><label>{lbl}</label><input value={mf[k]||""} onChange={e=>setMf({...mf,[k]:e.target.value})}/></div>)}
+      {[["hcap","핸디(부수차) 적용"],["gear","사용구 · 용구"]].map(([k,lbl])=><div key={k} style={{marginBottom:8}}><label>{lbl}</label><textarea value={mf[k]||""} onChange={e=>setMf({...mf,[k]:e.target.value})} style={{width:"100%",minHeight:60,border:"1px solid #cbd5e1",borderRadius:8,padding:9,fontSize:14}}/></div>)}
       <div style={{marginBottom:8}}><label>안내사항(공지)</label><textarea value={mf.notice||""} onChange={e=>setMf({...mf,notice:e.target.value})} style={{width:"100%",minHeight:90,border:"1px solid #cbd5e1",borderRadius:8,padding:9,fontSize:14}}/></div>
       <div style={{margin:"10px 0"}}><label>운영 종목 (체크한 종목만 참가자에게 표시)</label>
         <div className="row" style={{marginTop:6}}>{EVENTS.map(([k,t])=>{const on=(mf.events||["single","double","team"]).includes(k);
@@ -1104,17 +1195,15 @@ function Info({meta}){
       <Row label="장소">{meta.place}</Row>
       <Row label="주최·주관">{meta.host}</Row>
       <Row label="종목">{EVACT(meta).map(e=>e[1]).join(" · ")}</Row>
-      <Row label="게임방법">예선 3전2선승(조별리그) · 본선 5전3선승(토너먼트)</Row>
-      <Row label="참가자격">현 서울소방 직원·전직·가족(직계 존비속) · 의소대원 불가</Row>
+      <Row label="게임방법">{meta.game}</Row>
+      <Row label="참가자격">{meta.elig}</Row>
       <Row label="참가비">{meta.fee}</Row>
       <Row label="입금계좌">{meta.account}</Row>
       <Row label="신청마감">{meta.deadline}{meta.closed?" (마감됨)":""}</Row>
       <Row label="문의">{meta.contact}</Row>
     </tbody></table>
-    <h3>핸디(부수차) 적용</h3>
-    <p className="muted" style={{fontSize:13,lineHeight:1.7}}>개인단식 : 부수 차이만큼 약자가 선취점 (예: 1부 vs 3부 → 2점). 단체전 복식 : 부수합 차이 1→0, 2→1, 3~4→2, 5~7→3 (최대 3점). 60세 이상 1부수 하향 가능.</p>
-    <h3>사용구 · 용구</h3>
-    <p className="muted" style={{fontSize:13}}>엑시옴 브라보 40mm 백색구 · ITTF 공인 라켓/러버 · 스피드글루·벤졸 등 유해 화합물 금지.</p>
+    {meta.hcap&&<><h3>핸디(부수차) 적용</h3><p className="muted" style={{fontSize:13,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{meta.hcap}</p></>}
+    {meta.gear&&<><h3>사용구 · 용구</h3><p className="muted" style={{fontSize:13,whiteSpace:"pre-wrap"}}>{meta.gear}</p></>}
     {meta.notice&&<div><h3>안내사항</h3><p style={{fontSize:13,whiteSpace:"pre-wrap"}}>{meta.notice}</p></div>}
   </div>;
 }
@@ -1164,7 +1253,7 @@ function ResultsView({entries,states,meta,live}){
           <div className="g2">{gs.map(g=>{const lg=liveGroup(g,byId);return <table key={g.id}><thead><tr><th>{g.name}</th><th>이름(팀)</th><th>승-패</th><th>세트</th></tr></thead>
             <tbody>{standings(lg,st.prelim||{}).map((r,i)=><tr key={r.id}><td>{i+1}위</td><td>{(byId[r.id]||{}).name}</td><td>{r.win}-{r.loss}</td><td>{r.sw}-{r.sl}</td></tr>)}</tbody></table>;})}</div>
           <h4>본선 대진</h4>
-          {pd?<Bracket rounds={pd.rounds} winners={pd.kw} readOnly/>:<p className="muted">본선 대진 없음</p>}
+          {pd?<Bracket rounds={pd.rounds} winners={pd.kw} meta={(st.knockMeta||{})[d]} readOnly/>:<p className="muted">본선 대진 없음</p>}
         </>}
       </div>;})}
   </>;
