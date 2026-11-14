@@ -141,6 +141,7 @@
   .otitle{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 8px;font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-.3px}
   .otitle img{height:40px;width:auto}
   .pmx-wrap{display:flex}
+  .kb-page .scroll{overflow:visible!important}
   .kb-title{display:none}
   @media print{.kb-title{display:flex}}
   .kf{border-collapse:collapse;width:100%;table-layout:fixed;border:2px solid #111}
@@ -195,8 +196,6 @@
     body:not(:has(.pp)) .wrap{padding:10mm}
     .kb-page{break-after:page;page-break-after:always;break-inside:avoid;margin:0!important}
     .kb-page:last-child{break-after:auto;page-break-after:auto}
-    .kb-page .scroll{overflow:visible!important}
-    .kb-page .brk{zoom:var(--kz)}
     body:has(.kb-page) .card>h2{display:none}
   }
   @page{size:A4 portrait;margin:0}
@@ -226,7 +225,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-14f";
+const BUILD="2026-11-14g";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -1040,11 +1039,11 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
           : (divs.length===0?<p className="muted" style={{textAlign:"center"}}>본선 대진이 없습니다.</p>
              : divs.map(d=>{const rounds=buildRounds(seedsFromSnap(st,d,byId),(st.knockWinners||{})[d]||{});
                /* 출력 시 한 장(A4)에 한 부(그룹)씩 — 대진 크기에 맞춰 자동 축소 */
-               const cols=rounds.length+1,r0=rounds.length?rounds[0].length:1,kz=Math.min(1,700/(cols*214),930/(r0*80));
-               return <div key={d} className="kb-page" style={{marginBottom:24,"--kz":kz}}>
+               const cols=rounds.length+1,r0=rounds.length?rounds[0].length:1,kz=Math.min(1,690/(cols*180),880/(r0*72+40));
+               return <div key={d} className="kb-page" style={{marginBottom:24}}>
                  <div className="otitle kb-title"><img src={LOGO} alt=""/><span>{(meta&&meta.title)||"서울소방 탁구대회"} {EVLABEL[ev]} 본선 대진표</span></div>
                  <h3 style={{borderLeft:"4px solid #d32f2f",paddingLeft:8}}>{d} 본선 토너먼트</h3>
-                 {rounds.length?<Bracket rounds={rounds} winners={(st.knockWinners||{})[d]||{}} readOnly/>:<p className="muted">진출자 부족</p>}
+                 {rounds.length?<div className="kb-fit" style={{zoom:kz}}><Bracket rounds={rounds} winners={(st.knockWinners||{})[d]||{}} readOnly/></div>:<p className="muted">진출자 부족</p>}
                </div>;}))}
       </div>
     </>}
