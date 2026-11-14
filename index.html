@@ -229,7 +229,7 @@ const handicap=(a,b)=>Math.abs(dnum(a)-dnum(b));
 const DEFAULT_META={title:"제9회 서울소방재난본부장배 탁구대회",date:"2026. 11. 14.(토) 10:00~17:00",place:"서울소방학교 다목적체육관 (은평구 통일로 1031-28)",host:"주최·주관 : 서울소방탁구연합회",fee:"단식 1만원 / 단체전 무료 · 현장접수 불가",account:"하나은행 477-910458-85707 (예금주 박우진)",deadline:"2026. 11. 8.(일)",contact:"박병렬 010-9983-9289 · 박우진 010-9269-1310",notice:"",closed:false,events:["single","double","team"]};
 
 /* 화면에 열린 코드가 최신 배포본인지 확인(구버전 화면으로 조 편성 방지) — 배포 시 BUILD 값 변경 */
-const BUILD="2026-11-14i";
+const BUILD="2026-11-14j";
 async function isLatestBuild(){try{const h=await fetch("./index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());const m=h.match(/const BUILD="([^"]+)"/);return !m||m[1]===BUILD;}catch(e){return true;}}
 /* ---------- 대진 계산 엔진 ---------- */
 function tierOf(map,d){return (map&&map[d])?map[d]:d;}
@@ -411,7 +411,7 @@ async function fetchAll(){
   const ts=rt.data||[],states={};
   const put=e=>{if(!states[e])states[e]={};return states[e];};
   // 1단계: 종목 기본 상태(구버전 통째 저장분 포함)
-  ts.forEach(r=>{const k=r.event||"";if(k.indexOf('#')>=0)return;const s=put(k),d=r.data||{};Object.assign(s,d);
+  ts.forEach(r=>{const k=r.event||"";if(k.indexOf('#')>=0||k.indexOf(ARCH)===0)return;const s=put(k),d=r.data||{};Object.assign(s,d);
     if(d.prelim&&Object.keys(d.prelim).length)s._lp=d.prelim;
     if(d.knockWinners&&Object.keys(d.knockWinners).length)s._lk=d.knockWinners;});
   // 2단계: 경기별 저장분이 우선(동시 입력 덮어쓰기 방지)
@@ -424,6 +424,11 @@ async function fetchAll(){
       s.knockWinners[dvv]=s.knockWinners[dvv]||{};if(d.w)s.knockWinners[dvv][mid]=d.w;}});
   return {entries:re.data||[],states};
 }
+/* 대회 기록 보관 — tstate에 '_archive@대회명' 행으로 별도 저장(진행 데이터와 분리, 스키마 변경 없음) */
+const ARCH="_archive@";
+const listArchives=async()=>{const r=chk(await sb.from('tstate').select('*').like('event',ARCH+'%'));
+  return (r.data||[]).map(x=>({key:x.event,...(x.data||{})})).sort((a,b)=>String(b.savedAt||"").localeCompare(String(a.savedAt||"")));};
+const saveArchive=async(key,data)=>chk(await sb.from('tstate').upsert({event:key,data,updated_at:new Date().toISOString()}));
 // 종목 기본 상태: 경기 결과는 제외하고 저장(경기 결과는 경기별 행으로 따로 저장)
 const saveState=async(event,data)=>{const d={...data};delete d.prelim;delete d.knockWinners;delete d._lp;delete d._lk;
   return chk(await sb.from('tstate').upsert({event,data:d,updated_at:new Date().toISOString()}));};
@@ -1053,6 +1058,18 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
       </div>
     </>}
 
+    {tab==="set"&&<div className="card" style={{borderLeft:"4px solid #1F4E79"}}>
+      <h2 style={{marginTop:0}}>대회 기록 저장</h2>
+      <p className="muted" style={{fontSize:13,marginTop:0}}>현재 참가자 명단·조 편성·예선/본선 결과를 [대회결과] 메뉴에 영구 보관합니다. 진행 중인 데이터는 바뀌지 않으며, 연락처는 저장하지 않습니다. 같은 대회명으로 다시 저장하면 최신 결과로 갱신됩니다.</p>
+      <button className="btn btn-p" onClick={async()=>{
+        const title=(meta.title||"대회").trim(),key=ARCH+title+(meta.date?" "+meta.date:"");
+        if(!confirm(`「${title}」 대회 기록을 저장할까요?\n(같은 이름의 기록이 있으면 최신 결과로 갱신됩니다)`))return;
+        const strip=e=>{const m={...(e.meta||{})};["p1","p2"].forEach(k=>{if(m[k])m[k]={...m[k],phone:""};});return {id:e.id,event:e.event,name:e.name,org:e.org,div:e.div,meta:m};};
+        const sts={};EVACT(meta).forEach(([k])=>{if(states[k]){const x={...states[k]};delete x._lp;delete x._lk;sts[k]=x;}});
+        const m2={...meta};delete m2.account;
+        try{await saveArchive(key,{meta:m2,savedAt:new Date().toISOString(),entries:entries.map(strip),states:sts});alert("대회 기록이 저장되었습니다. [대회결과] 메뉴에서 확인하세요.");}catch(e){fail(e);}}}>현재 대회 기록 저장</button>
+    </div>}
+
     {tab==="set"&&<div className="card">
       <h2>대회 설정 · 안내</h2>
       <p className="muted" style={{fontSize:13,marginTop:0}}>여기서 저장한 내용이 [대회안내] 화면과 신청 화면에 표시됩니다.</p>
@@ -1103,6 +1120,78 @@ function Info({meta}){
 }
 
 /* ---------- 앱 ---------- */
+/* ---------- 대회 결과(현재 대회 + 역대 기록) ---------- */
+function podiumOf(st,d,byId){const kw=(st.knockWinners||{})[d]||{},rounds=buildRounds(seedsFromSnap(st,d,byId),kw);
+  if(!rounds.length)return null;const t=rounds.length,fin=rounds[t-1][0],champ=matchWinner(fin,kw);
+  const other=(m,w)=>w&&m.a&&m.b?(m.a.id===w.id?m.b:m.a):null;
+  const third=t>=2?rounds[t-2].map(m=>m.bye?null:other(m,matchWinner(m,kw))).filter(Boolean):[];
+  return {rounds,kw,champ,runner:other(fin,champ),third};}
+function ResultsView({entries,states,meta,live}){
+  const byId={};(entries||[]).forEach(e=>byId[e.id]=e);
+  const evs=EVACT(meta).filter(([k])=>states[k]);
+  const [ev,setEv]=useState((evs[0]||["single"])[0]);
+  useEffect(()=>{if(!evs.some(([k])=>k===ev)&&evs.length)setEv(evs[0][0]);},[meta.title,evs.length]);
+  const [open,setOpen]=useState({});
+  const st=states[ev]||{};
+  if(!evs.length)return <p className="muted">기록된 결과가 없습니다.</p>;
+  if(live&&!st.published)return <div className="msg" style={{background:"#f1f5f9",color:"#475569",textAlign:"center"}}>대진표 공개(확정) 후 결과가 표시됩니다.</div>;
+  const divs=divsOf(st);
+  const Who=({p})=>p?<span><b>{p.name}</b>{!p.ph&&<span className="muted" style={{fontSize:12,marginLeft:4}}>{rosterOf(p)?"":p.div}{p.org&&p.org!==p.name?" · "+p.org:""}</span>}<RosterLine m={p} cls="mx-ro"/></span>:<span className="muted">진행 중</span>;
+  const csv=()=>{const L=[["종목","부","구분","순위","이름(팀)","소속","부수","명단"]],q=v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`;
+    evs.forEach(([k,lbl])=>{const s2=states[k]||{};divsOf(s2).forEach(d=>{const pd=podiumOf(s2,d,byId);
+      const row=(gb,rk,p)=>p&&L.push([lbl,d,gb,rk,p.name,p.org&&p.org!==p.name?p.org:"",p.div||"",(rosterOf(p)||[]).join(" / ")]);
+      if(pd){row("본선","우승",pd.champ);row("본선","준우승",pd.runner);pd.third.forEach(p=>row("본선","공동3위",p));}
+      (s2.groups||[]).filter(g=>g.div===d).forEach(g=>{const lg=liveGroup(g,byId);standings(lg,s2.prelim||{}).forEach((r,i)=>row("예선 "+g.name,(i+1)+"위 ("+r.win+"승"+r.loss+"패)",byId[r.id]));});});});
+    const blob=new Blob(["﻿"+L.map(r=>r.map(q).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(meta.title||"대회")+"_결과.csv";a.click();};
+  return <>
+    <div className="segs">{evs.map(([k,t])=><button key={k} className={ev===k?"on":""} onClick={()=>setEv(k)}>{t}</button>)}</div>
+    <div className="row no-print" style={{justifyContent:"flex-end",gap:8,margin:"8px 0"}}>
+      <button className="btn btn-sm" onClick={csv}>결과 엑셀(CSV) 내려받기</button>
+      <button className="btn btn-sm" onClick={()=>window.print()}>인쇄 / PDF</button></div>
+    {divs.length===0&&<p className="muted">결과가 없습니다.</p>}
+    {divs.map(d=>{const pd=podiumOf(st,d,byId),gs=(st.groups||[]).filter(g=>g.div===d),ok=open[ev+d];
+      return <div className="card" key={d} style={{breakInside:"avoid"}}>
+        <h3 style={{marginTop:0,borderLeft:"4px solid #d32f2f",paddingLeft:8}}>{d}</h3>
+        <table><tbody>
+          <tr><td style={{width:90,fontWeight:700,color:"#b45309"}}>🥇 우승</td><td><Who p={pd&&pd.champ}/></td></tr>
+          <tr><td style={{fontWeight:700,color:"#475569"}}>🥈 준우승</td><td><Who p={pd&&pd.runner}/></td></tr>
+          <tr><td style={{fontWeight:700,color:"#92400e"}}>🥉 공동3위</td><td>{pd&&pd.third.length?pd.third.map((p,i)=><div key={i}><Who p={p}/></div>):<Who p={null}/>}</td></tr>
+        </tbody></table>
+        <button className="btn btn-sm no-print" style={{marginTop:8}} onClick={()=>setOpen(o=>({...o,[ev+d]:!ok}))}>{ok?"상세 접기":"예선 순위 · 본선 대진 보기"}</button>
+        {ok&&<>
+          <h4>예선 조별 순위</h4>
+          <div className="g2">{gs.map(g=>{const lg=liveGroup(g,byId);return <table key={g.id}><thead><tr><th>{g.name}</th><th>이름(팀)</th><th>승-패</th><th>세트</th></tr></thead>
+            <tbody>{standings(lg,st.prelim||{}).map((r,i)=><tr key={r.id}><td>{i+1}위</td><td>{(byId[r.id]||{}).name}</td><td>{r.win}-{r.loss}</td><td>{r.sw}-{r.sl}</td></tr>)}</tbody></table>;})}</div>
+          <h4>본선 대진</h4>
+          {pd?<Bracket rounds={pd.rounds} winners={pd.kw} readOnly/>:<p className="muted">본선 대진 없음</p>}
+        </>}
+      </div>;})}
+  </>;
+}
+function ResultsPage({entries,states,meta}){
+  const [arcs,setArcs]=useState(null),[sel,setSel]=useState("live"),[er,setEr]=useState("");
+  const load=async()=>{try{setArcs(await listArchives());setEr("");}catch(e){setEr("기록 불러오기 실패: "+((e&&e.message)||""));setArcs([]);}};
+  useEffect(()=>{load();},[]);
+  const a=sel!=="live"&&(arcs||[]).find(x=>x.key===sel);
+  return <div className="card">
+    <div className="row no-print" style={{justifyContent:"space-between",alignItems:"center"}}>
+      <h2 style={{margin:0}}>대회 결과</h2>
+      <select value={sel} onChange={e=>setSel(e.target.value)} style={{width:"auto",maxWidth:"60%"}}>
+        <option value="live">이번 대회 (실시간)</option>
+        {(arcs||[]).map(x=><option key={x.key} value={x.key}>{(x.meta&&x.meta.title)||x.key.slice(ARCH.length)}{x.meta&&x.meta.date?" · "+x.meta.date:""}</option>)}
+      </select></div>
+    {er&&<div className="msg msg-no">{er}</div>}
+    {a?<>
+      <p className="muted" style={{fontSize:13}}>{a.meta&&a.meta.date} {a.meta&&a.meta.place?" · "+a.meta.place:""} · 참가 {(a.entries||[]).length}건 · 기록 저장 {a.savedAt?new Date(a.savedAt).toLocaleString("ko-KR"):""}</p>
+      <ResultsView entries={a.entries||[]} states={a.states||{}} meta={{...DEFAULT_META,...(a.meta||{})}}/>
+    </>:<>
+      <p className="muted" style={{fontSize:13}}>{meta.title} · 진행 중인 대회의 현재 결과입니다. 대회 종료 후 운영진이 [대회 기록 저장]을 하면 위 목록에 영구 보관됩니다.</p>
+      <ResultsView entries={entries} states={states} meta={meta} live/>
+    </>}
+  </div>;
+}
+
 function App(){
   if(!configured) return <Setup/>;
   const [view,setView]=useState("register");
@@ -1123,7 +1212,7 @@ function App(){
       .on('postgres_changes',{event:'*',schema:'public',table:'tstate'},bump)
       .on('postgres_changes',{event:'*',schema:'public',table:'entries'},bump).subscribe();}catch(e){}
     return()=>{clearTimeout(t);try{if(ch)sb.removeChannel(ch);}catch(e){}};},[]);
-  const NAV=[["info","대회안내"],["register","참가신청"],["bracket","대진표 보기"],["admin","운영진"]];
+  const NAV=[["info","대회안내"],["register","참가신청"],["bracket","대진표 보기"],["results","대회결과"],["admin","운영진"]];
   return <>
     <div className="top"><div className="top-in">
       <img src={LOGO} alt="서울소방 119" style={{height:38,width:"auto",display:"block"}}/>
@@ -1136,6 +1225,7 @@ function App(){
       {loading&&<p className="muted">불러오는 중…</p>}
       {view==="info"&&<Info meta={meta}/>}
       {view==="register"&&<Register entries={entries} reload={reload} meta={meta}/>}
+      {view==="results"&&<ResultsPage entries={entries} states={states} meta={meta}/>}
       {view==="bracket"&&<PublicView entries={entries} states={states} reload={reload} meta={meta}/>}
       {view==="admin"&&(isAdmin?<Admin entries={entries} states={states} setStates={setStates} reload={reload} meta={meta} onErr={setErr}/>:<Login onOk={()=>setIsAdmin(true)}/>)}
     </div>
