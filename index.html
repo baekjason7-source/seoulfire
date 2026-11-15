@@ -84,8 +84,14 @@
   .ord-in{width:42px;text-align:center;padding:5px}
   .ord-pt{width:48px;text-align:center;padding:4px;font-size:12px;background:#f8fafc}
   /* 대진표(본선) */
-  .brk{display:flex;gap:24px;min-width:max-content;padding:6px 2px}
-  .brk-col{display:flex;flex-direction:column;justify-content:space-around;gap:14px}
+  .brk{display:flex;gap:32px;min-width:max-content;padding:6px 2px;align-items:stretch}
+  .brk-col{display:flex;flex-direction:column}
+  .brk-body{flex:1;display:flex;flex-direction:column}
+  .brk-slot{flex:1;display:flex;align-items:center;position:relative;padding:7px 0}
+  .brk-slot .ln-in{position:absolute;left:-16px;top:50%;width:16px;border-top:2px solid #94a3b8}
+  .brk-slot .ln-out{position:absolute;right:-16px;width:16px;border-right:2px solid #94a3b8}
+  .brk-slot .ln-out.a{top:50%;bottom:0;border-top:2px solid #94a3b8}
+  .brk-slot .ln-out.b{top:0;bottom:50%;border-bottom:2px solid #94a3b8;margin-bottom:-2px}
   .brk-col p{font-size:12px;color:#94a3b8;text-align:center;margin:0 0 2px;font-weight:600}
   .brk-m{border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;width:190px}
   .brk-m button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid #eef2f7;color:#475569}
@@ -535,14 +541,17 @@ function Bracket({rounds,winners,onPick,readOnly,meta}){
   const t=rounds.length, champ=matchWinner(rounds[t-1][0],winners);
   return (<div className="scroll"><div className="brk">
     {rounds.map((round,ri)=>(
-      <div className="brk-col" key={ri}><p>{roundName(ri,t)}</p>
-        {round.map(m=>{const w=matchWinner(m,winners),mm=km[m.id]||{},hasSc=mm.sa!=null&&mm.sb!=null;
+      <div className="brk-col" key={ri}><p>{roundName(ri,t)}</p><div className="brk-body">
+        {round.map((m,mi)=>{const w=matchWinner(m,winners),mm=km[m.id]||{},hasSc=mm.sa!=null&&mm.sb!=null;
           const Side=({pl,sc})=>(<button disabled={readOnly||!pl||pl.ph} className={w&&pl&&w.id===pl.id?"w":""}
             onClick={()=>pl&&!pl.ph&&onPick&&onPick(m.id,pl.id)}>{pl?(pl.ph?<span style={{color:"#64748b"}}>{pl.name}</span>:<>{pl.name}{pl.div&&!rosterOf(pl)?<span style={{fontSize:11,color:"#64748b",marginLeft:4}}>({pl.div})</span>:null}</>):<span className="muted">{m.bye?"부전승":"미정"}</span>}{hasSc&&pl?<b style={{float:"right"}}>{sc}</b>:null}</button>);
-          return <div className="brk-m" key={m.id} style={mm.t&&!w?{borderColor:"#1F4E79",boxShadow:"0 0 0 2px #bfdbfe"}:undefined}>
+          return <div className="brk-slot" key={m.id}>
+            {ri>0&&<i className="ln-in"/>}
+            {ri<t-1&&<i className={"ln-out "+(mi%2===0?"a":"b")}/>}
+            <div className="brk-m" style={mm.t&&!w?{borderColor:"#1F4E79",boxShadow:"0 0 0 2px #bfdbfe"}:undefined}>
             {mm.t&&!w&&<div style={{background:"#1F4E79",color:"#fff",fontSize:11,padding:"2px 8px"}}>🏓 {mm.t}번 탁구대 · 경기 중</div>}
-            <Side pl={m.a} sc={mm.sa}/><Side pl={m.b} sc={mm.sb}/></div>;})}
-      </div>))}
+            <Side pl={m.a} sc={mm.sa}/><Side pl={m.b} sc={mm.sb}/></div></div>;})}
+      </div></div>))}
     {champ&&<div style={{display:"flex",flexDirection:"column",justifyContent:"center"}}><p style={{fontSize:12,color:"#94a3b8",textAlign:"center"}}>우승</p><div className="champ">🏆 {champ.name}</div></div>}
   </div></div>);
 }
