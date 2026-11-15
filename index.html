@@ -84,12 +84,12 @@
   .ord-in{width:42px;text-align:center;padding:5px}
   .ord-pt{width:48px;text-align:center;padding:4px;font-size:12px;background:#f8fafc}
   /* 대진표(본선) */
-  .brk{display:flex;gap:32px;min-width:max-content;padding:6px 2px;align-items:stretch}
+  .brk{--g:16px;display:flex;gap:calc(var(--g)*2);min-width:max-content;padding:6px 2px;align-items:stretch}
   .brk-col{display:flex;flex-direction:column}
   .brk-body{flex:1;display:flex;flex-direction:column}
   .brk-slot{flex:1;display:flex;align-items:center;position:relative;padding:7px 0}
-  .brk-slot .ln-in{position:absolute;left:-16px;top:50%;width:16px;border-top:2px solid #94a3b8}
-  .brk-slot .ln-out{position:absolute;right:-16px;width:16px;border-right:2px solid #94a3b8}
+  .brk-slot .ln-in{position:absolute;left:calc(var(--g)*-1);top:50%;width:var(--g);border-top:2px solid #94a3b8}
+  .brk-slot .ln-out{position:absolute;right:calc(var(--g)*-1);width:var(--g);border-right:2px solid #94a3b8}
   .brk-slot .ln-out.a{top:50%;bottom:0;border-top:2px solid #94a3b8}
   .brk-slot .ln-out.b{top:0;bottom:50%;border-bottom:2px solid #94a3b8;margin-bottom:-2px}
   .brk-col p{font-size:12px;color:#94a3b8;text-align:center;margin:0 0 2px;font-weight:600}
@@ -207,6 +207,30 @@
     .kb-page{break-after:page;page-break-after:always;break-inside:avoid;margin:0!important}
     .kb-page:last-child{break-after:auto;page-break-after:auto}
     body:has(.kb-page) .card>h2{display:none}
+    /* 본선 대진표 출력: 그룹별 A4 한 장을 꽉 채우도록 배치 */
+    body:has(.kb-page) .top{display:none!important}
+    body:has(.kb-page) .wrap{padding:0!important;margin:0}
+    .kb-page{height:296mm;box-sizing:border-box;padding:9mm 8mm 8mm;display:flex;flex-direction:column;overflow:hidden}
+    .kb-page .otitle{font-size:17pt;margin:0 0 3mm}
+    .kb-page .otitle img{height:12mm}
+    .kb-page h3{font-size:14pt;margin:0 0 3mm}
+    .kb-fit{zoom:1!important;flex:1;min-height:0;display:flex}
+    .kb-fit .scroll{flex:1;display:flex}
+    .kb-fit .brk{--g:9px;flex:1;min-width:0;padding:0}
+    .kb-fit .brk-col{flex:1 1 0;min-width:0}
+    .kb-fit .brk-col p{font-size:10pt;color:#334155;margin:0 0 1mm}
+    .kb-fit .brk-slot{padding:.6mm 0}
+    .kb-fit .brk-m{width:100%;border-color:#64748b;border-radius:4px;box-shadow:none!important}
+    .kb-fit .brk-m>div{display:none}
+    .kb-fit .brk-m button{padding:1.1mm 1.6mm;line-height:1.25;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom-color:#cbd5e1}
+    .kb-fit .brk-m button span{font-size:.78em!important;margin-left:2px!important}
+    .kb-fit .brk-slot .ln-in,.kb-fit .brk-slot .ln-out{border-color:#475569!important}
+    .kb-fit .brk>div:last-child:not(.brk-col){flex:0 0 22mm}
+    .kb-fit .champ{width:auto;padding:2mm;font-size:11pt}
+    .kb-fit.f4 .brk-m button{font-size:15pt}
+    .kb-fit.f8 .brk-m button{font-size:12.5pt}
+    .kb-fit.f16 .brk-m button{font-size:10pt}
+    .kb-fit.f32 .brk-m button{font-size:7pt;padding:.5mm 1.2mm}
   }
   @page{size:A4 portrait;margin:0}
 </style>
@@ -1142,7 +1166,7 @@ function Admin({entries,states,setStates,reload,meta,onErr}){
                return <div key={d} className="kb-page" style={{marginBottom:24}}>
                  <div className="otitle kb-title"><img src={LOGO} alt=""/><span>{(meta&&meta.title)||"서울소방 탁구대회"} {EVLABEL[ev]} 본선 대진표</span></div>
                  <h3 style={{borderLeft:"4px solid #d32f2f",paddingLeft:8}}>{d} 본선 토너먼트</h3>
-                 {rounds.length?<div className="kb-fit" style={{zoom:kz}}><Bracket rounds={rounds} winners={(st.knockWinners||{})[d]||{}} meta={(st.knockMeta||{})[d]} readOnly/></div>:<p className="muted">진출자 부족</p>}
+                 {rounds.length?<div className={"kb-fit "+(r0<=4?"f4":r0<=8?"f8":r0<=16?"f16":"f32")} style={{zoom:kz}}><Bracket rounds={rounds} winners={(st.knockWinners||{})[d]||{}} meta={(st.knockMeta||{})[d]} readOnly/></div>:<p className="muted">진출자 부족</p>}
                </div>;}))}
       </div>
     </>}
